@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { query } from "@workspace/db";
+import { query } from "../lib/db";
 import { issueToken, optionalAuth } from "../middleware/auth";
 
 const router = Router();

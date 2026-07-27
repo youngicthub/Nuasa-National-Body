@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import multer from "multer";
 import bcrypt from "bcryptjs";
-import { query } from "@workspace/db";
+import { query } from "../lib/db";
 import { optionalAuth } from "../middleware/auth";
 
 const router = Router();

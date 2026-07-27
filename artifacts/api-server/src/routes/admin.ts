@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { requireAdmin } from "../middleware/auth";
-import { query } from "@workspace/db";
+import { query } from "../lib/db";
 
 const router = Router();
 

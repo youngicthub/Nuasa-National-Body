@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { query } from "@workspace/db";
+import { query } from "../lib/db";
 
 const router = Router();
 

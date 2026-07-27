@@ -1,5 +1,5 @@
 - [NUASA migration - Supabase kept](nuasa-supabase-kept.md) — App kept Supabase connection; replacing with Replit primitives is a separate task.
-- [MySQL 8.0 startup on Replit](mysql-startup-approach.md) — Init WITHOUT --innodb-undo-directory, start WITH it pointing to a separate empty dir; never init+start with the same flag.
+- [MySQL 8.0 undo tablespace fix (Nix)](mysql-undo-restart-fix.md) — Always delete undo_* from datadir before every mysqld start; 8.0.42 on Nix recreates them on every boot and crashes if they exist.
 - [Lovable migration CSS fix](lovable-css-fix.md) — Lovable apps use @import before @tailwind; copy script doesn't fix this.
 - [Artifact workflows](artifact-workflows.md) — Use artifact-managed service workflows as canonical; remove duplicate legacy workflows after artifact registration.
 - [Imported workflow naming](imported-workflow-naming.md) — Imported artifact metadata may exist without runtime registration; verify actual workflow names before restarting.

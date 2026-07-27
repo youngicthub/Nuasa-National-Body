@@ -3,8 +3,6 @@
 set -euo pipefail
 
 # ── Base URL auto-detection ───────────────────────────────────────────────────
-# Production (NODE_ENV=production) → live domain
-# Everything else                  → localhost (Vite dev server default port)
 if [ "${NODE_ENV:-development}" = "production" ]; then
   export FRONTEND_URL="${FRONTEND_URL:-http://nuasanational.com.ng}"
 else
@@ -13,7 +11,6 @@ fi
 echo "[start-api] FRONTEND_URL=${FRONTEND_URL}"
 
 MYSQL_DATADIR="/home/runner/.mysql-data"
-MYSQL_UNDODIR="/home/runner/.mysql-undo"
 MYSQL_RUNDIR="/home/runner/.mysql-run"
 MYSQL_SOCK="$MYSQL_RUNDIR/mysqld.sock"
 MYSQL_LOG="$MYSQL_RUNDIR/error.log"
@@ -22,12 +19,12 @@ DB_NAME="${DB_NAME:-nuasa_database}"
 DB_USER="${DB_USER:-nuasa_user}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 
+# NOTE: No --innodb-undo-directory. Keeping everything in datadir avoids the
+# "Can't create UNDO tablespace / Could not find tablespace ID" crash cycle
+# that occurs when init and start use different undo-directory settings.
 MYSQLD_ARGS=(
   --datadir="$MYSQL_DATADIR"
   --basedir="$MYSQL_BASEDIR"
-  # undo dir must be SEPARATE from datadir; init (below) puts its own undo
-  # files in datadir — that's fine, mysqld will manage its own in UNDODIR.
-  --innodb-undo-directory="$MYSQL_UNDODIR"
   --socket="$MYSQL_SOCK"
   --pid-file="$MYSQL_RUNDIR/mysqld.pid"
   --log-error="$MYSQL_LOG"
@@ -37,16 +34,11 @@ MYSQLD_ARGS=(
   --user=runner
 )
 
-mkdir -p "$MYSQL_DATADIR" "$MYSQL_UNDODIR" "$MYSQL_RUNDIR"
+mkdir -p "$MYSQL_DATADIR" "$MYSQL_RUNDIR"
 
-# ── 1. Initialize data directory once ─────────────────────────────────────────
-# IMPORTANT: run init WITHOUT --innodb-undo-directory so that the data
-# dictionary does NOT register a separate undo dir. mysqld will then find an
-# empty UNDODIR on first start and create its own undo tablespaces there.
+# ── 1. Initialize data directory once ────────────────────────────────────────
 if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
   echo "[start-api] Initializing MySQL data directory..."
-  # A previous failed init can leave stale files (e.g. is_writable) that
-  # cause --initialize to abort with EEXIST.  Wipe those before retrying.
   rm -f "$MYSQL_DATADIR/is_writable" "$MYSQL_DATADIR/is_readable" \
         "$MYSQL_DATADIR"/*.pem 2>/dev/null || true
   mysqld \
@@ -57,18 +49,19 @@ if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
   echo "[start-api] Init complete"
 fi
 
-# ── 2. Clean up stale socket / pid / undo files from a previous run ──────────
+# ── 2. Clean up before each start ────────────────────────────────────────────
 rm -f "$MYSQL_SOCK" "$MYSQL_RUNDIR/mysqld.sock.lock" "$MYSQL_RUNDIR/mysqld.pid"
-# Undo tablespace files must not pre-exist when mysqld starts; remove them so
-# mysqld recreates them cleanly (data lives in datadir, not here).
-rm -f "$MYSQL_UNDODIR"/undo_*
+# MySQL 8.0.42 on this Nix build runs srv_undo_tablespaces_create() on EVERY
+# startup and aborts if undo files already exist.  After a clean shutdown the
+# undo logs are empty, so deleting them here lets mysqld recreate them with
+# the same fixed space-IDs (4294967294 / 4294967293) each time.
+rm -f "$MYSQL_DATADIR"/undo_*
 
-# ── 3. Launch mysqld in the background ────────────────────────────────────────
+# ── 3. Launch mysqld in the background ───────────────────────────────────────
 echo "[start-api] Starting mysqld..."
 mysqld "${MYSQLD_ARGS[@]}" &
 MYSQLD_PID=$!
 
-# Shut mysqld down cleanly when this script exits
 cleanup() {
   echo "[start-api] Shutting down mysqld (pid $MYSQLD_PID)..."
   mysqladmin --socket="$MYSQL_SOCK" shutdown 2>/dev/null \
@@ -78,7 +71,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# ── 4. Wait for mysqld to be ready (up to 30 s) ───────────────────────────────
+# ── 4. Wait for mysqld to be ready (up to 30 s) ──────────────────────────────
 echo "[start-api] Waiting for MySQL..."
 for i in $(seq 1 30); do
   if mysqladmin --socket="$MYSQL_SOCK" ping --silent 2>/dev/null; then
@@ -131,7 +124,7 @@ fi
 # ── 6. Build and start the API server ────────────────────────────────────────
 cd /home/runner/workspace/artifacts/api-server
 echo "[start-api] Building API server..."
-pnpm run build
+npm run build
 
 echo "[start-api] Starting API server..."
 exec node --enable-source-maps ./dist/index.mjs
