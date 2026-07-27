@@ -22,6 +22,8 @@ Both services start automatically via their configured workflows:
 
 The frontend is served at `/` (port 21844 → external 80) and the API at `/api` (port 8080).
 
+The Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests to `http://127.0.0.1:8080` (the API Server port).
+
 `scripts/start-api.sh` handles MySQL init, DB/user/schema setup on first run, builds the API, then starts it. MySQL data lives in `~/.mysql-data`; the setup marker at `~/.mysql-run/.db_setup_done` prevents re-running schema import on subsequent starts.
 
 ### On your local machine (single command)
