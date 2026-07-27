@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Upload, FileText, X, Loader2, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
+import { ImageUpload } from "./ImageUpload";
 
 interface ResourceUploadFormProps {
   onSuccess?: () => void;
@@ -33,27 +34,24 @@ export function ResourceUploadForm({ onSuccess }: ResourceUploadFormProps) {
     category_id: "",
     course: "",
     level: "",
+    cover_image: "",
     is_public: false,
     is_featured: false,
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories-library"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .in("type", ["library", "both"])
-        .order("name");
-      if (error) throw error;
-      return data;
+      const res = await apiFetch<{ data: any[] }>("/data/categories?order=name");
+      return (res.data ?? []).filter(
+        (c: any) => c.type === "library" || c.type === "both"
+      );
     },
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Check file size (max 50MB)
       if (selectedFile.size > 50 * 1024 * 1024) {
         toast.error("File size must be less than 50MB");
         return;
@@ -68,41 +66,38 @@ export function ResourceUploadForm({ onSuccess }: ResourceUploadFormProps) {
 
     setIsUploading(true);
     try {
-      // Upload file to storage
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `resources/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("library-files")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("library-files")
-        .getPublicUrl(filePath);
+      // Upload the resource file via /api/uploads
+      const fileBody = new FormData();
+      fileBody.append("file", file);
+      const { publicUrl: fileUrl } = await apiFetch<{ path: string; publicUrl: string }>("/uploads", {
+        method: "POST",
+        body: fileBody,
+      });
 
       // Insert resource record
-      const { error: insertError } = await supabase
-        .from("library_resources")
-        .insert({
+      const fileExt = file.name.split(".").pop() ?? "";
+      const res = await apiFetch<{ data: any; error: any }>("/data/library_resources", {
+        method: "POST",
+        body: JSON.stringify({
           title: formData.title,
-          description: formData.description,
-          file_url: urlData.publicUrl,
+          description: formData.description || null,
+          file_url: fileUrl,
           file_name: file.name,
           file_size: file.size,
           file_type: file.type || fileExt,
+          cover_image: formData.cover_image || null,
           category_id: formData.category_id || null,
           author_id: user.id,
           course: formData.course || null,
           level: formData.level || null,
           is_public: formData.is_public,
           is_featured: formData.is_featured,
-        });
+          download_count: 0,
+          view_count: 0,
+        }),
+      });
 
-      if (insertError) throw insertError;
+      if (res.error) throw new Error(res.error.message || "Failed to save resource");
 
       toast.success("Resource uploaded successfully!");
       setFile(null);
@@ -112,13 +107,14 @@ export function ResourceUploadForm({ onSuccess }: ResourceUploadFormProps) {
         category_id: "",
         course: "",
         level: "",
+        cover_image: "",
         is_public: false,
         is_featured: false,
       });
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload resource");
+      toast.error(error?.message || "Failed to upload resource");
     } finally {
       setIsUploading(false);
     }
@@ -126,7 +122,7 @@ export function ResourceUploadForm({ onSuccess }: ResourceUploadFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* File Upload Area */}
+      {/* Resource File Upload Area */}
       <div
         onClick={() => fileInputRef.current?.click()}
         className={`
@@ -198,6 +194,13 @@ export function ResourceUploadForm({ onSuccess }: ResourceUploadFormProps) {
             rows={3}
           />
         </div>
+
+        {/* Cover Image */}
+        <ImageUpload
+          label="Cover Image (optional)"
+          value={formData.cover_image}
+          onChange={(url) => setFormData({ ...formData, cover_image: url })}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

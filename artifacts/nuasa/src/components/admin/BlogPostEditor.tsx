@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ImageUpload } from "./ImageUpload";
 import { motion } from "framer-motion";
 import {
   Bold,
@@ -445,15 +446,11 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cover_image">Cover Image URL</Label>
-            <Input
-              id="cover_image"
-              value={formData.cover_image}
-              onChange={(e) => setFormData({ ...formData, cover_image: e.target.value })}
-              placeholder="https://..."
-            />
-          </div>
+          <ImageUpload
+            label="Cover Image"
+            value={formData.cover_image}
+            onChange={(url) => setFormData({ ...formData, cover_image: url })}
+          />
 
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="is_featured">Featured Post</Label>

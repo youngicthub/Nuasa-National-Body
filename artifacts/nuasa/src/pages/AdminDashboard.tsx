@@ -83,7 +83,7 @@ const AdminDashboard = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("library_resources")
-        .select("id, title, download_count, is_public, category:categories(name)")
+        .select("id, title, download_count, view_count, is_public, category:categories(name)")
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
@@ -369,6 +369,7 @@ const AdminDashboard = () => {
                         <TableRow>
                           <TableHead>Title</TableHead>
                           <TableHead>Category</TableHead>
+                          <TableHead>Views</TableHead>
                           <TableHead>Downloads</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
@@ -386,6 +387,12 @@ const AdminDashboard = () => {
                               <Badge variant="outline">
                                 {resource.category?.name || "Uncategorized"}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <Eye className="w-3 h-3" />
+                                {(resource.view_count || 0).toLocaleString()}
+                              </span>
                             </TableCell>
                             <TableCell>{(resource.download_count || 0).toLocaleString()}</TableCell>
                             <TableCell>

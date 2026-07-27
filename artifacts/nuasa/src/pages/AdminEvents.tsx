@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 import { format } from "date-fns";
 
 const AdminEvents = () => {
@@ -124,10 +125,11 @@ const AdminEvents = () => {
                     <Label htmlFor="location">Location</Label>
                     <Input id="location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                   </div>
-                  <div>
-                    <Label htmlFor="cover_image">Cover image URL</Label>
-                    <Input id="cover_image" value={form.cover_image} onChange={(e) => setForm({ ...form, cover_image: e.target.value })} placeholder="https://..." />
-                  </div>
+                  <ImageUpload
+                    label="Cover Image"
+                    value={form.cover_image}
+                    onChange={(url) => setForm({ ...form, cover_image: url })}
+                  />
                   <div>
                     <Label htmlFor="link">Registration / info link</Label>
                     <Input id="link" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="https://..." />
