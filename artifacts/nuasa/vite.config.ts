@@ -72,7 +72,9 @@ export default defineConfig({
 
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8080",
+        // Use API_PORT / API_URL env-var when running locally so you can
+        // match whatever port your local API server listens on.
+        target: process.env.API_URL || `http://127.0.0.1:${process.env.API_PORT || 8080}`,
         changeOrigin: true,
         secure: false,
       },

@@ -45,6 +45,10 @@ mkdir -p "$MYSQL_DATADIR" "$MYSQL_UNDODIR" "$MYSQL_RUNDIR"
 # empty UNDODIR on first start and create its own undo tablespaces there.
 if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
   echo "[start-api] Initializing MySQL data directory..."
+  # A previous failed init can leave stale files (e.g. is_writable) that
+  # cause --initialize to abort with EEXIST.  Wipe those before retrying.
+  rm -f "$MYSQL_DATADIR/is_writable" "$MYSQL_DATADIR/is_readable" \
+        "$MYSQL_DATADIR"/*.pem 2>/dev/null || true
   mysqld \
     --initialize-insecure \
     --datadir="$MYSQL_DATADIR" \
