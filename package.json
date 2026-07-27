@@ -1,0 +1,29 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "artifacts/nuasa"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=artifacts/nuasa run dev",
+    "build": "npm --workspace=artifacts/nuasa run build",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/nodemailer": "^8.0.1",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "mysql2": "^3.23.1",
+    "nodemailer": "^9.0.3"
+  }
+}

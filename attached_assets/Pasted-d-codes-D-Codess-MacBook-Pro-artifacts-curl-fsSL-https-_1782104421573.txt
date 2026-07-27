@@ -1,0 +1,60 @@
+d_codes@D-Codess-MacBook-Pro artifacts % curl -fsSL https://get.pnpm.io/install.sh | sh -
+pnpm v11.8.0 does not provide a working binary for Intel macOS (darwin-x64) due to an upstream Node.js SEA bug.
+
+Install pnpm a different way instead:
+  npm install -g pnpm           # uses your system Node.js
+  brew install pnpm             # via Homebrew
+  corepack enable pnpm          # bundled with Node.js
+
+More context: https://github.com/pnpm/pnpm/issues/11423
+d_codes@D-Codess-MacBook-Pro artifacts % PORT=5173 BASE_PATH=/ pnpm --filter @workspace/nuasa run dev
+/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535
+  if (key == null || signature == null) throw new Error(`Cannot find matching keyid: ${JSON.stringify({ signatures, keys })}`);
+                                              ^
+
+Error: Cannot find matching keyid: {"signatures":[{"sig":"MEUCICJTkdrgSTecRTLtKWpQndImSERv9ZZyCnfi0Du6y6AtAiEAhM3BzFhogZe/pf1Gnc4Gcksngl+bjp2jdsZoD8CBPVk=","keyid":"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"}],"keys":[{"expires":null,"keyid":"SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA","keytype":"ecdsa-sha2-nistp256","scheme":"ecdsa-sha2-nistp256","key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1Olb3zMAFFxXKHiIkQO5cJ3Yhl5i6UPp+IhuteBJbuHcA5UogKo0EWtlWwW6KSaKoTNEYL7JlCQiVnkhBktUgg=="}]}
+    at verifySignature (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535:47)
+    at fetchLatestStableVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21553:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async fetchLatestStableVersion2 (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21672:14)
+    at async Engine.getDefaultVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22292:23)
+    at async Engine.executePackageManagerRequest (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22390:47)
+    at async Object.runMain (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:23096:5)
+
+Node.js v22.12.0
+d_codes@D-Codess-MacBook-Pro artifacts % cd Downloads/convention-joy-sync-main                       
+cd: no such file or directory: Downloads/convention-joy-sync-main
+d_codes@D-Codess-MacBook-Pro artifacts % cd ..
+d_codes@D-Codess-MacBook-Pro convention-joy-sync-main % pnpm install
+
+
+/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535
+  if (key == null || signature == null) throw new Error(`Cannot find matching keyid: ${JSON.stringify({ signatures, keys })}`);
+                                              ^
+
+Error: Cannot find matching keyid: {"signatures":[{"sig":"MEUCICJTkdrgSTecRTLtKWpQndImSERv9ZZyCnfi0Du6y6AtAiEAhM3BzFhogZe/pf1Gnc4Gcksngl+bjp2jdsZoD8CBPVk=","keyid":"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"}],"keys":[{"expires":null,"keyid":"SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA","keytype":"ecdsa-sha2-nistp256","scheme":"ecdsa-sha2-nistp256","key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1Olb3zMAFFxXKHiIkQO5cJ3Yhl5i6UPp+IhuteBJbuHcA5UogKo0EWtlWwW6KSaKoTNEYL7JlCQiVnkhBktUgg=="}]}
+    at verifySignature (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535:47)
+    at fetchLatestStableVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21553:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async fetchLatestStableVersion2 (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21672:14)
+    at async Engine.getDefaultVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22292:23)
+    at async Engine.executePackageManagerRequest (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22390:47)
+    at async Object.runMain (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:23096:5)
+
+Node.js v22.12.0
+d_codes@D-Codess-MacBook-Pro convention-joy-sync-main % PORT=5173 BASE_PATH=/ pnpm --filter @workspace/nuasa run dev
+/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535
+  if (key == null || signature == null) throw new Error(`Cannot find matching keyid: ${JSON.stringify({ signatures, keys })}`);
+                                              ^
+
+Error: Cannot find matching keyid: {"signatures":[{"sig":"MEUCICJTkdrgSTecRTLtKWpQndImSERv9ZZyCnfi0Du6y6AtAiEAhM3BzFhogZe/pf1Gnc4Gcksngl+bjp2jdsZoD8CBPVk=","keyid":"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"}],"keys":[{"expires":null,"keyid":"SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA","keytype":"ecdsa-sha2-nistp256","scheme":"ecdsa-sha2-nistp256","key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1Olb3zMAFFxXKHiIkQO5cJ3Yhl5i6UPp+IhuteBJbuHcA5UogKo0EWtlWwW6KSaKoTNEYL7JlCQiVnkhBktUgg=="}]}
+    at verifySignature (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21535:47)
+    at fetchLatestStableVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21553:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async fetchLatestStableVersion2 (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:21672:14)
+    at async Engine.getDefaultVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22292:23)
+    at async Engine.executePackageManagerRequest (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22390:47)
+    at async Object.runMain (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:23096:5)
+
+Node.js v22.12.0
+d_codes@D-Codess-MacBook-Pro convention-joy-sync-main % 

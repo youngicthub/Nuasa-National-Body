@@ -1,0 +1,482 @@
+# NUASA NATIONAL BODY — SUPABASE TO LOCAL MYSQL MIGRATION
+
+You are working on an existing NUASA National Body website originally built with Lovable AI.
+
+The project currently uses Supabase, but the Supabase project is paused. Your task is to migrate the existing project to a local MySQL database while preserving all existing functionality, UI, routes, API endpoints, authentication, admin features, and data relationships.
+
+Do not rebuild or redesign the project. First inspect the existing codebase, then execute the migration.
+
+---
+
+## 1. AUDIT THE EXISTING PROJECT
+
+Scan the entire repository and identify:
+
+* All Supabase database queries and client usage
+* Supabase Auth
+* Supabase Storage
+* Supabase RPC/functions
+* Realtime subscriptions
+* Database migrations and schema files
+* All tables, columns, relationships, keys, indexes, triggers, functions, enums, and RLS policies
+* All frontend pages and routes
+* All backend/API endpoints
+* Existing user and admin authentication
+* All CRUD operations and existing functionality
+
+Use the actual existing project structure. Do not invent tables, columns, API endpoints, or functionality.
+
+---
+
+## 2. MIGRATE SUPABASE/POSTGRESQL TO MYSQL
+
+Replace Supabase/PostgreSQL database functionality with MySQL 8+.
+
+Preserve:
+
+* Existing table names where possible
+* Existing column names where possible
+* Primary keys
+* Foreign keys
+* Relationships
+* Indexes
+* Unique constraints
+* Important defaults
+* Existing data where accessible
+
+Convert PostgreSQL data types correctly to MySQL equivalents.
+
+Create:
+
+```text
+database.sql
+```
+
+This file must recreate the complete database and be importable using:
+
+```bash
+mysql -u root -p < database.sql
+```
+
+It must work with MySQL Workbench, phpMyAdmin, XAMPP MySQL, and MAMP MySQL.
+
+---
+
+## 3. REPLACE SUPABASE DATABASE ACCESS
+
+Use the existing backend architecture.
+
+If the project uses Node.js/Express, use `mysql2` with a connection pool and parameterized queries.
+
+Use environment variables:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=nuasa_database
+DB_USER=root
+DB_PASSWORD=
+```
+
+Never hardcode database credentials.
+
+Never use unsafe SQL string concatenation.
+
+---
+
+## 4. PRESERVE ALL API ENDPOINTS
+
+Find and document all existing API endpoints before changing them.
+
+Preserve their:
+
+* HTTP methods
+* Paths
+* Request formats
+* Response formats
+* Authentication
+* Authorization
+* Existing frontend behavior
+
+If the frontend currently calls Supabase directly, create equivalent local backend API endpoints and update the frontend to use them.
+
+Do not unnecessarily change the existing API contract.
+
+---
+
+# 5. USER AUTHENTICATION
+
+Implement or preserve regular user:
+
+* Signup
+* Signin
+* Logout
+* Current user/session
+* Email verification
+* Resend verification email
+* Password reset if currently available
+
+Use:
+
+* MySQL
+* bcrypt
+* JWT or secure HTTP-only sessions
+* Nodemailer
+
+Passwords must never be stored in plain text.
+
+User signup must:
+
+1. Validate the input.
+2. Check for existing email.
+3. Hash the password with bcrypt.
+4. Create the user in MySQL.
+5. Assign the default user role.
+6. Set email verification to false.
+7. Generate a secure verification token.
+8. Store only the hashed token.
+9. Send a verification email using Nodemailer.
+
+User signin must:
+
+1. Validate credentials.
+2. Verify the password.
+3. Check account status.
+4. Check email verification status where required.
+5. Create a secure session or JWT.
+6. Return only safe user information.
+
+---
+
+# 6. ADMIN AUTHENTICATION
+
+Implement or preserve separate administrator authentication:
+
+* Admin signup or secure admin invitation
+* Admin signin
+* Admin logout
+* Current admin/session
+* Role-based access control
+* Protected admin routes and APIs
+
+Do not allow unrestricted public admin registration.
+
+Use either an existing authorized admin invitation flow or a protected environment secret:
+
+```env
+ADMIN_SIGNUP_SECRET=replace_with_secure_secret
+```
+
+If direct admin signup is used, the backend must validate this secret.
+
+Never expose the secret to the frontend.
+
+Preserve existing roles found in the project, such as:
+
+```text
+admin
+super_admin
+editor
+moderator
+staff
+```
+
+Do not invent unnecessary roles.
+
+A regular user must never be able to access admin APIs by changing frontend requests. Authorization must always be enforced on the backend.
+
+---
+
+# 7. EMAIL VERIFICATION WITH NODEMAILER
+
+Remove Supabase email verification and use Nodemailer.
+
+Install if necessary:
+
+```bash
+npm install nodemailer
+```
+
+Create a reusable email service.
+
+When a user or admin registers:
+
+1. Generate a secure random token using Node.js crypto.
+2. Store only the hashed token.
+3. Set an expiration time.
+4. Send the verification email using Nodemailer.
+5. Verify the token through the backend.
+6. Mark the account as verified.
+7. Invalidate the token after use.
+
+Use a suitable existing database structure or add the necessary email verification fields/table.
+
+Support:
+
+* Email verification
+* Resend verification email
+* Password reset emails if currently available
+* Admin invitation emails if an invitation system is used
+
+Never hardcode SMTP credentials.
+
+Add to `.env.example`:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@example.com
+SMTP_PASSWORD=your_email_password_or_app_password
+
+MAIL_FROM_NAME=NUASA National Body
+MAIL_FROM_EMAIL=your_email@example.com
+```
+
+---
+
+# 8. EMAIL VERIFICATION API
+
+Create or preserve the appropriate endpoints, for example:
+
+```text
+GET  /api/auth/verify-email?token=TOKEN
+POST /api/auth/resend-verification
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+```
+
+Preserve existing endpoint paths if they already exist.
+
+Verification must:
+
+* Validate the token
+* Check expiration
+* Prevent reuse
+* Mark the account as verified
+* Invalidate the token
+
+---
+
+# 9. SUPABASE STORAGE
+
+If the application uses Supabase Storage, replace it with suitable local file storage while preserving existing upload functionality.
+
+Use an appropriate local directory such as:
+
+```text
+uploads/
+```
+
+Preserve existing database file/image references.
+
+---
+
+# 10. SUPABASE FUNCTIONS, RPC, REALTIME, AND RLS
+
+Find all:
+
+* `supabase.rpc()`
+* PostgreSQL functions
+* Triggers
+* Realtime subscriptions
+* Edge Functions
+* RLS policies
+
+Recreate only functionality actually used by the application using:
+
+* MySQL
+* Node.js
+* Express
+* Middleware
+* Socket.IO or another appropriate local solution if realtime is required
+
+Convert RLS rules into backend authentication and role-based authorization.
+
+Do not simply remove security rules.
+
+---
+
+# 11. BASE URL AND ENVIRONMENT CONFIGURATION
+
+The application must work both locally and in production without changing source code.
+
+The live NUASA website is:
+
+```text
+http://nuasanational.com.ng/
+```
+
+Use environment variables instead of hardcoding URLs.
+
+## Local Development
+
+```env
+NODE_ENV=development
+
+FRONTEND_URL=http://localhost:5173
+VITE_API_URL=http://localhost:5000/api
+```
+
+## Production
+
+```env
+NODE_ENV=production
+
+FRONTEND_URL=http://nuasanational.com.ng
+VITE_API_URL=http://nuasanational.com.ng/api
+```
+
+Use the production API URL above only if the backend is hosted on the same domain under `/api`.
+
+If the backend is hosted on a separate domain or subdomain, use the actual production backend URL.
+
+The backend must use `FRONTEND_URL` for:
+
+* Email verification links
+* Password reset links
+* Admin invitation links
+* Frontend redirects
+
+Do not hardcode localhost or the production domain in application logic.
+
+Configure CORS to support:
+
+```text
+http://localhost:5173
+```
+
+during development and:
+
+```text
+http://nuasanational.com.ng
+```
+
+in production.
+
+---
+
+# 12. COMPLETE .ENV.EXAMPLE
+
+Create:
+
+```text
+.env.example
+```
+
+Include:
+
+```env
+NODE_ENV=development
+
+PORT=5000
+
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=nuasa_database
+DB_USER=root
+DB_PASSWORD=
+
+JWT_SECRET=replace_with_secure_secret
+ADMIN_SIGNUP_SECRET=replace_with_secure_secret
+
+FRONTEND_URL=http://localhost:5173
+VITE_API_URL=http://localhost:5000/api
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@example.com
+SMTP_PASSWORD=your_email_password_or_app_password
+
+MAIL_FROM_NAME=NUASA National Body
+MAIL_FROM_EMAIL=your_email@example.com
+
+UPLOAD_DIR=uploads
+```
+
+Use the actual project requirements.
+
+Ensure `.env` is included in `.gitignore`.
+
+Never expose database credentials, JWT secrets, SMTP passwords, or admin signup secrets in frontend code.
+
+---
+
+# 13. PRESERVE THE FRONTEND
+
+Keep the existing:
+
+* UI
+* Pages
+* Components
+* Navigation
+* Routes
+* Admin dashboard
+* User dashboard
+* Forms
+* Existing functionality
+
+Only update Supabase-dependent code to use the new local backend API.
+
+Do not unnecessarily redesign the website.
+
+---
+
+# 14. TEST EVERYTHING
+
+After migration, test and fix the project.
+
+Verify:
+
+* Website loads
+* Frontend works
+* Backend works
+* MySQL connection works
+* `database.sql` imports successfully
+* User signup works
+* User signin works
+* User logout works
+* Email verification works
+* Resend verification works
+* Password reset works if available
+* Admin signup/invitation works
+* Admin signin works
+* Admin logout works
+* Role permissions work
+* Protected routes work
+* Admin APIs are protected
+* CRUD operations work
+* Forms work
+* File uploads work if applicable
+* Existing API endpoints work
+* Existing website features work
+
+Fix all migration-related errors.
+
+---
+
+# REQUIRED FINAL OUTPUT
+
+The final project must contain:
+
+```text
+database.sql
+.env.example
+```
+
+Also create a concise migration report containing:
+
+1. Original Supabase tables → New MySQL tables
+2. All preserved API endpoints
+3. Supabase features → Their local replacements
+4. User authentication implementation
+5. Admin authentication implementation
+6. Email verification implementation
+7. Exact local setup commands
+
+The project must run independently of the paused Supabase project.
+
+Do not stop at analyzing the code. Execute the migration, create the required files, update the code, test the application, and fix errors.
+
+Focus on completing the migration efficiently without unnecessary explanations or repeated analysis.

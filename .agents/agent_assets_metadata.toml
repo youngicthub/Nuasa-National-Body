@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "eMpHQPGlKGqaRCFXgPFib"
+uri = "file://nuasa_database_export.sql"
+type = "unspecified"
+title = "NUASA Database Export (MySQL)"

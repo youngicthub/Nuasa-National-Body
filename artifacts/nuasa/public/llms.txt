@@ -1,0 +1,18 @@
+# NUASA National Body
+
+> National Union of Accountancy Students Association — National Body E-Library and Blog. Thousands of accounting resources, research papers, study guides, past questions, and articles for Nigerian students.
+
+## Pages
+
+- [Home](/): Overview of the NUASA National Body platform, featured resources, and latest posts.
+- [E-Library](/library): Searchable digital library of accounting resources, research papers, study materials, and past questions across categories like Auditing, Taxation, and Public Sector Accounting.
+- [Blog](/blog): Articles and insights from NUASA contributors on accounting, careers, and student life.
+- [Chapters](/chapters): Directory of NUASA chapters at universities across Nigeria.
+- [Events](/events): Upcoming and past NUASA conferences, workshops, and chapter activities.
+
+## Optional
+
+- [Login](/login): Account sign-in for registered students.
+- [Register](/register): Create a free NUASA student account.
+- [Privacy Policy](/privacy)
+- [Terms of Service](/terms)

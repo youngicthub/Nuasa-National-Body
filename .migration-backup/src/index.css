@@ -1,0 +1,290 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* NUASA National E-Library & Blog Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core Brand Colors - Green / White / Black NUASA Theme */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+
+    /* Primary - Deep Green */
+    --primary: 152 86% 16%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Soft Green Tint */
+    --secondary: 150 30% 92%;
+    --secondary-foreground: 152 86% 16%;
+
+    /* Muted */
+    --muted: 150 15% 96%;
+    --muted-foreground: 0 0% 35%;
+
+    /* Accent - Vivid Green */
+    --accent: 152 70% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 150 15% 88%;
+    --input: 150 15% 88%;
+    --ring: 152 86% 16%;
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 7%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 152 70% 40%;
+    --sidebar-primary-foreground: 0 0% 7%;
+    --sidebar-accent: 152 30% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 152 20% 20%;
+    --sidebar-ring: 152 70% 40%;
+
+    /* Custom Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(0 0% 7%) 0%, hsl(152 86% 12%) 50%, hsl(152 70% 22%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(152 70% 36%) 0%, hsl(152 80% 28%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(150 20% 98%) 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    --shadow-glow: 0 0 40px hsl(152 70% 36% / 0.25);
+  }
+
+  .dark {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 152 70% 40%;
+    --primary-foreground: 0 0% 7%;
+
+    --secondary: 152 20% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 152 70% 45%;
+    --accent-foreground: 0 0% 7%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 152 70% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  /* Hero Section Styles */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .accent-gradient {
+    background: var(--gradient-accent);
+  }
+
+  .glass-card {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Card Hover Effects */
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-1;
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* Text Gradient */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-accent);
+  }
+
+  /* Animated Underline */
+  .animated-underline {
+    @apply relative;
+  }
+
+  .animated-underline::after {
+    content: '';
+    @apply absolute bottom-0 left-0 h-0.5 w-0 bg-accent transition-all duration-300;
+  }
+
+  .animated-underline:hover::after {
+    @apply w-full;
+  }
+
+  /* Fade In Animation */
+  .fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide Up Animation */
+  .slide-up {
+    animation: slideUp 0.6s ease-out forwards;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Pulse Glow */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(202, 138, 4, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(202, 138, 4, 0.4);
+    }
+  }
+
+  /* Floating Animation */
+  .float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Page Container */
+  .page-container {
+    @apply min-h-screen flex flex-col;
+  }
+
+  .content-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full;
+  }
+
+  /* Section Spacing */
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+
+  /* Classy decorative divider — gold rule with center diamond */
+  .ornament-divider {
+    @apply flex items-center justify-center gap-3 my-4;
+  }
+  .ornament-divider::before,
+  .ornament-divider::after {
+    content: '';
+    @apply h-px w-12 md:w-20;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.6), transparent);
+  }
+  .ornament-divider span {
+    @apply text-accent text-xs tracking-[0.3em] uppercase font-medium;
+  }
+
+  /* Subtle grid background pattern */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(hsl(var(--primary-foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary-foreground) / 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Elevated card with gold top accent on hover */
+  .classy-card {
+    @apply relative bg-card rounded-2xl border border-border overflow-hidden transition-all duration-500 ease-out;
+    box-shadow: var(--shadow-sm);
+  }
+  .classy-card::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-px opacity-0 transition-opacity duration-500;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent)), transparent);
+  }
+  .classy-card:hover {
+    @apply -translate-y-1.5 border-accent/30;
+    box-shadow: var(--shadow-xl), var(--shadow-glow);
+  }
+  .classy-card:hover::before {
+    @apply opacity-100;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

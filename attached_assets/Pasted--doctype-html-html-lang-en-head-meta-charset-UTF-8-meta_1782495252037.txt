@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/jpeg" href="/nuasa-logo.jpeg" />
+    <title>NUASA National Body — E-Library & Blog</title>
+    <meta name="description" content="NUASA National Body E-Library & Blog: thousands of accounting resources, research papers, study guides, past questions, and articles for Nigerian students." />
+    <meta name="author" content="NUASA National Body" />
+    <meta name="google-site-verification" content="EtvBU03SmbBikKP6dmw3rBOTomzR01xnnU_6ESrAGlQ" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="NUASA National Body" />
+    <meta property="og:url" content="https://nuasanational.com.ng/" />
+    <meta property="og:image" content="https://nuasanational.com.ng/opengraph.jpg">
+    <link rel="canonical" href="https://nuasanational.com.ng/" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@NUASANational" />
+    <meta name="twitter:image" content="https://nuasanational.com.ng/opengraph.jpg">
+    <meta property="og:title" content="NUASA National Body — E-Library & Blog" />
+    <meta name="twitter:title" content="NUASA National Body — E-Library & Blog" />
+    <meta property="og:description" content="National E-Library & Blog with thousands of accounting resources, research, and study materials for Nigerian students." />
+    <meta name="twitter:description" content="National E-Library & Blog with thousands of accounting resources, research, and study materials for Nigerian students." />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "NUASA National Body",
+        "url": "https://nuasanational.com.ng/",
+        "logo": "https://nuasanational.com.ng/nuasa-logo.jpeg",
+        "description": "National Union of Accountancy Students Association — National Body E-Library & Blog for Nigerian accounting students.",
+        "sameAs": []
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "NUASA National Body",
+        "url": "https://nuasanational.com.ng/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://nuasanational.com.ng/library?search={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+  <script type="module" crossorigin src="/assets/index-BbcukrZa.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CwUf3ZQ-.css">
+</head>
+
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
