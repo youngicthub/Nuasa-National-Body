@@ -16,7 +16,15 @@ declare global {
   }
 }
 
-const secret = () => process.env.JWT_SECRET || "nuasa-local-development-secret";
+function secret(): string {
+  const value = process.env.JWT_SECRET;
+  if (!value) {
+    // index.ts validates this at startup; this is defense-in-depth for
+    // anything that imports this module without going through index.ts.
+    throw new Error("JWT_SECRET environment variable is required.");
+  }
+  return value;
+}
 
 export function readAuth(req: Request): AuthUser | undefined {
   const header = req.get("authorization");

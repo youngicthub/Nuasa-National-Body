@@ -1,10 +1,32 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
+import rateLimit from "express-rate-limit";
 import { query } from "../lib/db";
 import { issueToken, optionalAuth } from "../middleware/auth";
 
 const router = Router();
+
+// ─── Rate limiting ─────────────────────────────────────────────────────────────
+// Credential-guessing targets (login, admin-signup secret) get a tight
+// per-IP limit. Account-creation / email-triggering endpoints get a looser
+// one, mainly to stop mailbox-bombing and account-creation spam.
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again in a few minutes." },
+});
+
+const looseLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again later." },
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +74,7 @@ async function issueVerificationToken(userId: string): Promise<string> {
 
 // ─── Sign-up ─────────────────────────────────────────────────────────────────
 
-router.post("/signup", async (req, res, next) => {
+router.post("/signup", looseLimiter, async (req, res, next) => {
   try {
     const { email, password, metadata = {} } = req.body ?? {};
     if (!email || !password || password.length < 6) {
@@ -116,7 +138,7 @@ router.post("/signup", async (req, res, next) => {
 // ─── Admin sign-up ───────────────────────────────────────────────────────────
 // Requires ADMIN_SIGNUP_SECRET from the request body — validated server-side only.
 
-router.post("/admin-signup", async (req, res, next) => {
+router.post("/admin-signup", strictLimiter, async (req, res, next) => {
   try {
     const { email, password, full_name, secret } = req.body ?? {};
 
@@ -168,7 +190,7 @@ router.post("/admin-signup", async (req, res, next) => {
 
 // ─── Sign-in ─────────────────────────────────────────────────────────────────
 
-router.post("/signin", async (req, res, next) => {
+router.post("/signin", strictLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body ?? {};
     const rows = await query<any[]>(
@@ -183,6 +205,13 @@ router.post("/signin", async (req, res, next) => {
     const row = rows[0];
     if (!row || !(await bcrypt.compare(password || "", row.password_hash))) {
       res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+    if (!row.email_verified) {
+      res.status(403).json({
+        error: "Please verify your email before signing in.",
+        code: "EMAIL_NOT_VERIFIED",
+      });
       return;
     }
     const user = { id: row.id, email: row.email, role: row.role, full_name: row.full_name };
@@ -253,7 +282,7 @@ router.post("/password", optionalAuth, async (req, res, next) => {
 
 // ─── Forgot / reset password ──────────────────────────────────────────────────
 
-router.post("/reset-password", async (req, res, next) => {
+router.post("/reset-password", looseLimiter, async (req, res, next) => {
   try {
     const { email, token, password } = req.body ?? {};
 
@@ -367,7 +396,7 @@ router.get("/verify-email", async (req, res, next) => {
 
 // ─── Resend verification email ────────────────────────────────────────────────
 
-router.post("/resend-verification", async (req, res, next) => {
+router.post("/resend-verification", looseLimiter, async (req, res, next) => {
   try {
     const { email } = req.body ?? {};
     if (!email) {

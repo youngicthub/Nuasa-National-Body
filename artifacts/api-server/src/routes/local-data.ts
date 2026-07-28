@@ -6,10 +6,36 @@ import multer from "multer";
 import bcrypt from "bcryptjs";
 import { query } from "../lib/db";
 import { optionalAuth } from "../middleware/auth";
+import { maybeCompress } from "../lib/compress";
 
 const router = Router();
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
-const upload = multer({ dest: uploadDir });
+
+// Deliberately excludes image/svg+xml — SVGs can embed <script> and would
+// execute same-origin when served back via GET /uploads/:file below, i.e.
+// stored XSS.
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "image/jpeg", "image/png", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+const upload = multer({
+  dest: uploadDir,
+  limits: { fileSize: 50 * 1024 * 1024 }, // matches the frontend's largest cap (ResourceUploadForm, 50MB)
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype)) {
+      cb(new Error(`Unsupported file type: ${file.mimetype}`));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 const TABLES = new Set([
   "users", "profiles", "user_roles", "categories", "tags", "blog_posts",
@@ -30,9 +56,38 @@ const ANON_INSERT_TABLES = new Set([
   "site_visits",
 ]);
 
+// Tables that only admins may write to (INSERT/UPDATE/DELETE). Content
+// tables are readable publicly (see PUBLIC_TABLES) but only admin-writable.
+const ADMIN_WRITE_TABLES = new Set([
+  "users", "user_roles", "app_settings", "admin_login_log", "site_visits",
+  "categories", "tags", "blog_posts", "blog_post_tags",
+  "library_resources", "library_resource_tags", "chapters",
+  "events", "executives",
+]);
+
+// Tables where each row belongs to a single user (column name given).
+// Non-admins are scoped to their own rows for read/write; admins see all.
+const OWNED_TABLES: Record<string, string> = {
+  profiles: "user_id",
+  saved_posts: "user_id",
+  saved_resources: "user_id",
+  resource_views: "user_id",
+  resource_downloads: "user_id",
+  post_views: "user_id",
+  convention_registrations: "user_id",
+};
+
 function assertTable(table: string) {
   if (!TABLES.has(table)) throw new Error("Unsupported table");
   return table;
+}
+
+function isAdmin(req: any) {
+  return req.authUser?.role === "admin";
+}
+
+function forbidden(res: any) {
+  res.status(403).json({ data: null, error: { message: "Administrator access required" } });
 }
 
 function cleanColumns(value: unknown, _table: string) {
@@ -87,11 +142,18 @@ router.use("/data", optionalAuth);
 router.get("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
-    if (!PUBLIC_TABLES.has(table) && !ensureAuth(req, res)) return;
+    const ownerColumn = OWNED_TABLES[table];
+    if (!PUBLIC_TABLES.has(table)) {
+      if (!ensureAuth(req, res)) return;
+      // Non-public tables are either scoped to the caller's own rows
+      // (ownerColumn set) or admin-only reads (everything else, e.g.
+      // users, user_roles, app_settings, admin_login_log, site_visits).
+      if (!ownerColumn && !isAdmin(req)) return forbidden(res);
+    }
     const columns = cleanColumns(req.query.select, table).join(", ");
     const { filters, params } = parseFilters(req.query as Record<string, unknown>);
-    if (table === "convention_registrations" && req.authUser?.role !== "admin") {
-      filters.push("`user_id` = ?");
+    if (ownerColumn && !isAdmin(req)) {
+      filters.push(`\`${ownerColumn}\` = ?`);
       params.push(req.authUser!.id);
     }
     const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
@@ -115,8 +177,13 @@ router.get("/data/:table", async (req, res, next) => {
 router.post("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
+    const ownerColumn = OWNED_TABLES[table];
     // Allow anonymous inserts for specific tables (e.g. site_visits)
-    if (!ANON_INSERT_TABLES.has(table) && !ensureAuth(req, res)) return;
+    const anonInsert = ANON_INSERT_TABLES.has(table);
+    if (!anonInsert) {
+      if (!ensureAuth(req, res)) return;
+      if (ADMIN_WRITE_TABLES.has(table) && !isAdmin(req)) return forbidden(res);
+    }
     const records = Array.isArray(req.body) ? req.body : [req.body];
     if (table === "convention_registrations") {
       if (records.length !== 1) {
@@ -137,11 +204,15 @@ router.post("/data/:table", async (req, res, next) => {
     }
     const inserted: any[] = [];
     for (const input of records) {
-      const row = {
+      const row: Record<string, unknown> = {
         id: crypto.randomUUID(),
         ...input,
-        ...(table === "convention_registrations" ? { user_id: req.authUser!.id } : {}),
       };
+      // Non-admins can never set another user's owner column, no matter
+      // what the request body says — always pin it to the caller.
+      if (ownerColumn && !isAdmin(req)) {
+        row[ownerColumn] = req.authUser!.id;
+      }
       // If inserting into users table with a plain password, hash it first
       if (table === "users" && typeof row.password === "string" && row.password.length > 0) {
         row.password_hash = await bcrypt.hash(row.password, 12);
@@ -179,8 +250,17 @@ router.patch("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
     if (!ensureAuth(req, res)) return;
+    const ownerColumn = OWNED_TABLES[table];
+    const admin = isAdmin(req);
+    if (ADMIN_WRITE_TABLES.has(table) && !admin) return forbidden(res);
     const keys = Object.keys(req.body || {}).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key) && key !== "id");
     const parsed = parseFilters(req.query as Record<string, unknown>);
+    // Non-admins on an owned table can only ever touch their own rows,
+    // regardless of what filter the caller passed.
+    if (ownerColumn && !admin) {
+      parsed.filters.push(`\`${ownerColumn}\` = ?`);
+      parsed.params.push(req.authUser!.id);
+    }
     const params = [...keys.map((key) => req.body[key]), ...parsed.params];
     if (!keys.length || !parsed.filters.length) {
       res.status(400).json({ error: "Update requires fields and a filter" });
@@ -199,7 +279,14 @@ router.delete("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
     if (!ensureAuth(req, res)) return;
+    const ownerColumn = OWNED_TABLES[table];
+    const admin = isAdmin(req);
+    if (ADMIN_WRITE_TABLES.has(table) && !admin) return forbidden(res);
     const parsed = parseFilters(req.query as Record<string, unknown>);
+    if (ownerColumn && !admin) {
+      parsed.filters.push(`\`${ownerColumn}\` = ?`);
+      parsed.params.push(req.authUser!.id);
+    }
     if (!parsed.filters.length) {
       res.status(400).json({ error: "Delete requires a filter" });
       return;
@@ -223,7 +310,15 @@ router.post("/uploads", optionalAuth, upload.single("file"), async (req, res, ne
     await fs.mkdir(uploadDir, { recursive: true });
     const extension = path.extname(req.file.originalname);
     const target = path.join(uploadDir, `${req.file.filename}${extension}`);
-    await fs.rename(req.file.path, target);
+
+    const compressed = await maybeCompress(req.file.path, req.file.mimetype);
+    if (compressed) {
+      await fs.writeFile(target, compressed);
+      await fs.unlink(req.file.path).catch(() => {});
+    } else {
+      await fs.rename(req.file.path, target);
+    }
+
     res.json({ path: path.basename(target), publicUrl: `/api/uploads/${path.basename(target)}` });
   } catch (err) {
     next(err);
@@ -232,6 +327,9 @@ router.post("/uploads", optionalAuth, upload.single("file"), async (req, res, ne
 
 router.get("/uploads/:file", async (req, res) => {
   const file = path.basename(req.params.file);
+  // Even for an allowed file type, never let the browser guess a different
+  // (executable) content type than what we stored it as.
+  res.setHeader("X-Content-Type-Options", "nosniff");
   res.sendFile(file, { root: uploadDir });
 });
 

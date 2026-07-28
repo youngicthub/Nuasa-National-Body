@@ -72,7 +72,7 @@ const Register = () => {
       return;
     }
 
-    toast.success("Account created successfully!");
+    toast.success("Account created! Check your email to verify your address.");
     navigate("/dashboard");
   };
 

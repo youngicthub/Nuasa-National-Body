@@ -5,7 +5,11 @@
  * Automatically attaches the JWT bearer token from localStorage when present,
  * so authenticated endpoints (admin, user data) work without extra boilerplate.
  */
-const API_BASE = "/api";
+// VITE_API_URL lets the frontend and API server live on different origins
+// (e.g. separate cPanel subdomains). Defaults to a same-origin relative
+// path, which is what local dev (via the Vite proxy) and same-origin
+// production deploys both want.
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const TOKEN_KEY = "nuasa_local_access_token";
 
 export function getAuthToken(): string | null {

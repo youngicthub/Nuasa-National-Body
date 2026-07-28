@@ -102,8 +102,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-VITE_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhemdveHhkYXJ2bm5pd21jbnN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NDcyNjksImV4cCI6MjA4NDQyMzI2OX0.0v11vL9PqpQ-HCV1MDzOL3_1-qDML0XP87oWmSgMay8"
-VITE_SUPABASE_URL = "https://qazgoxxdarvnniwmcnst.supabase.co"
 DB_HOST = "127.0.0.1"
 DB_NAME = "nuasa_database"
 DB_PASSWORD = "nuasa_pass_2026"

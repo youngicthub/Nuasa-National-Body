@@ -7,9 +7,12 @@ type LocalUser = {
 export type Session = { access_token: string; user: LocalUser };
 export type User = LocalUser;
 
-const API_BASE = "/api";
+// See src/lib/api.ts for why this is configurable rather than hardcoded.
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const TOKEN_KEY = "nuasa_local_access_token";
 const listeners = new Set<(event: string, session: Session | null) => void>();
+
+export type ApiError = Error & { code?: string; status?: number };
 
 async function request(path: string, init?: RequestInit) {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -18,7 +21,13 @@ async function request(path: string, init?: RequestInit) {
   if (init?.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || payload?.error || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const message = payload?.error?.message || payload?.error || `Request failed (${response.status})`;
+    const error: ApiError = new Error(message);
+    error.code = payload?.code;
+    error.status = response.status;
+    throw error;
+  }
   return payload;
 }
 
@@ -152,6 +161,18 @@ export const supabase = {
     async resetPasswordForEmail(email: string) {
       try {
         await request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email }) });
+        return { error: null };
+      } catch (error) { return { error: error as Error }; }
+    },
+    async verifyEmail(token: string) {
+      try {
+        await request("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) });
+        return { error: null };
+      } catch (error) { return { error: error as Error }; }
+    },
+    async resendVerification(email: string) {
+      try {
+        await request("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) });
         return { error: null };
       } catch (error) { return { error: error as Error }; }
     },

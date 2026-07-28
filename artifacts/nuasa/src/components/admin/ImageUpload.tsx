@@ -20,9 +20,9 @@ export function ImageUpload({ value, onChange, label = "Cover Image" }: ImageUpl
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowed.includes(file.type)) {
-      toast.error("Only image files are allowed (JPG, PNG, GIF, WebP, SVG)");
+      toast.error("Only image files are allowed (JPG, PNG, GIF, WebP)");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
