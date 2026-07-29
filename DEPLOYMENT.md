@@ -62,7 +62,7 @@ fresh deploy is easier to eyeball.
 ### 2. Backend
 On your machine:
 ```bash
-pnpm --filter @workspace/api-server run build
+pnpm --filter nuasa-api-server run build
 ```
 This produces `artifacts/api-server/dist/index.mjs` — one bundled file.
 `mysql2`, `nodemailer`, and **`sharp`** are deliberately excluded from the
@@ -165,7 +165,7 @@ http/https will get silently blocked by the browser.
 
 ## Redeploying after a code change
 
-- **API**: rebuild (`pnpm --filter @workspace/api-server run build`),
+- **API**: rebuild (`pnpm --filter nuasa-api-server run build`),
   re-upload `dist/index.mjs`, click **Restart** in the Node.js App page. If
   `package.json` changed (new/removed dependency), re-run **Run NPM
   Install** first.
