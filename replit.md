@@ -7,24 +7,27 @@ A full-stack e-library platform for NUASA (National University Academic Staff As
 | Layer | Tech |
 |---|---|
 | Frontend | React 19, Vite, TypeScript, shadcn-ui, Tailwind CSS, Framer Motion |
-| Backend API | Express 5, TypeScript, Pino logging |
-| Database | MySQL (via `mysql2`) |
-| Auth/Data | Supabase (frontend) |
-| Monorepo | pnpm workspace |
+| Backend API | Express 5, TypeScript, Pino logging, mysql2 |
+| Database | MySQL 8 (embedded, starts automatically via `scripts/start-api.sh`) |
+| Monorepo | pnpm workspace (also has npm workspace root scripts) |
 
-## How to run
+## How to run on Replit
 
-### On Replit
 Both services start automatically via their configured workflows:
 
-- **Frontend** (`Frontend` workflow) — `PORT=21844 pnpm --filter @workspace/nuasa run dev`
-- **API Server** (`API Server` workflow) — `PORT=8080 bash scripts/start-api.sh`
+- **Frontend** — workflow `artifacts/nuasa: web` — `PORT=21844 BASE_PATH=/ npm --prefix artifacts/nuasa run dev`
+- **API Server** — workflow `artifacts/api-server: API Server` — `PORT=8080 bash scripts/start-api.sh`
 
-The frontend is served at `/` (port 21844 → external 80) and the API at `/api` (port 8080).
+The frontend is served at `/` (port 21844) and the API at port 8080.
 
-The Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests to `http://127.0.0.1:8080` (the API Server port).
+The Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests to `http://127.0.0.1:8080`.
 
-`scripts/start-api.sh` handles MySQL init, DB/user/schema setup on first run, builds the API, then starts it. MySQL data lives in `~/.mysql-data`; the setup marker at `~/.mysql-run/.db_setup_done` prevents re-running schema import on subsequent starts.
+`scripts/start-api.sh` handles MySQL init, DB/user/schema setup on first run (`database.sql`), builds the TypeScript API, then starts it. MySQL data lives in `~/.mysql-data`; socket at `~/.mysql-run/mysqld.sock`. The setup marker at `~/.mysql-run/.db_setup_done` prevents re-running schema import on subsequent starts.
+
+**Install dependencies** (run once after cloning or if node_modules is missing):
+```bash
+npm install
+```
 
 ### On your local machine (single command)
 

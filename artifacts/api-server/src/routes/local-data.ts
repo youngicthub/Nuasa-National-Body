@@ -88,12 +88,13 @@ function forbidden(res: any) {
   res.status(403).json({ data: null, error: { message: "Administrator access required" } });
 }
 
+// Returns column identifiers escaped with MySQL backticks
 function cleanColumns(value: unknown, _table: string) {
   const allowed = /^[a-zA-Z0-9_, ]+$/.test(String(value || ""))
     ? String(value).split(",").map((column) => column.trim().split(":")[0]).filter(Boolean)
     : [];
   const cols = allowed.length
-    ? allowed.filter((column) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)).map((col) => `"${col}"`)
+    ? allowed.filter((column) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)).map((col) => `\`${col}\``)
     : [];
   return cols.length ? cols : ["*"];
 }
@@ -108,7 +109,7 @@ function parseFilters(queryParams: Record<string, unknown>) {
       if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)) {
         const values = value.split(",").filter(Boolean);
         if (values.length) {
-          filters.push(`"${column}" IN (${values.map(() => "?").join(",")})`);
+          filters.push(`\`${column}\` IN (${values.map(() => "?").join(",")})`);
           params.push(...values);
         }
       }
@@ -118,10 +119,10 @@ function parseFilters(queryParams: Record<string, unknown>) {
     const column = key.includes(".") ? key.slice(key.indexOf(".") + 1) : key;
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)) continue;
     if (operator === "not" && typeof value === "string") {
-      filters.push(`"${column}" IS NOT NULL`);
+      filters.push(`\`${column}\` IS NOT NULL`);
     } else if (["eq", "gte", "lte", "lt", "gt"].includes(operator)) {
       const SQL_OP: Record<string, string> = { eq: "=", gte: ">=", lte: "<=", lt: "<", gt: ">" };
-      filters.push(`"${column}" ${SQL_OP[operator]} ?`);
+      filters.push(`\`${column}\` ${SQL_OP[operator]} ?`);
       params.push(value);
     }
   }
@@ -151,14 +152,14 @@ router.get("/data/:table", async (req, res, next) => {
     const columns = cleanColumns(req.query.select, table).join(", ");
     const { filters, params } = parseFilters(req.query as Record<string, unknown>);
     if (ownerColumn && !isAdmin(req)) {
-      filters.push(`"${ownerColumn}" = ?`);
+      filters.push(`\`${ownerColumn}\` = ?`);
       params.push(req.authUser!.id);
     }
     const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
     const order = typeof req.query.order === "string" && /^[a-zA-Z_][a-zA-Z0-9_]*(\.(asc|desc))?$/.test(req.query.order)
-      ? ` ORDER BY "${req.query.order.split(".")[0]}" ${req.query.order.endsWith(".desc") ? "DESC" : "ASC"}` : "";
+      ? ` ORDER BY \`${req.query.order.split(".")[0]}\` ${req.query.order.endsWith(".desc") ? "DESC" : "ASC"}` : "";
     const limit = req.query.limit && /^\d+$/.test(String(req.query.limit)) ? ` LIMIT ${Math.min(Number(req.query.limit), 2000)}` : "";
-    const rows = await query<any[]>(`SELECT ${columns} FROM "${table}"${where}${order}${limit}`, params);
+    const rows = await query<any[]>(`SELECT ${columns} FROM \`${table}\`${where}${order}${limit}`, params);
     if (req.query.head === "true") {
       res.json({ data: null, count: rows.length, error: null });
       return;
@@ -215,19 +216,18 @@ router.post("/data/:table", async (req, res, next) => {
       const keys = Object.keys(row).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key));
       const values = keys.map((key) => row[key] === undefined ? null : row[key]);
       const updateKeys = keys.filter((key) => key !== "id" && key !== "key");
-      // PostgreSQL upsert: ON CONFLICT (pk) DO UPDATE SET ...
-      const pkColumn = table === "app_settings" ? "key" : "id";
+      // MySQL upsert: ON DUPLICATE KEY UPDATE ...
       const duplicateClause = req.query.upsert === "true" && updateKeys.length
-        ? ` ON CONFLICT ("${pkColumn}") DO UPDATE SET ${updateKeys.map((key) => `"${key}" = EXCLUDED."${key}"`).join(", ")}`
+        ? ` ON DUPLICATE KEY UPDATE ${updateKeys.map((key) => `\`${key}\` = VALUES(\`${key}\`)`).join(", ")}`
         : "";
       try {
         await query(
-          `INSERT INTO "${table}" (${keys.map((key) => `"${key}"`).join(",")}) VALUES (${keys.map(() => "?").join(",")})${duplicateClause}`,
+          `INSERT INTO \`${table}\` (${keys.map((key) => `\`${key}\``).join(",")}) VALUES (${keys.map(() => "?").join(",")})${duplicateClause}`,
           values,
         );
       } catch (error: any) {
-        // PostgreSQL unique violation: error.code === '23505'
-        if (table === "convention_registrations" && error?.code === "23505") {
+        // MySQL unique violation: error.code === 'ER_DUP_ENTRY' (errno 1062)
+        if (table === "convention_registrations" && (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062)) {
           res.status(409).json({
             data: null,
             error: { message: "You are already registered for the convention." },
@@ -256,7 +256,7 @@ router.patch("/data/:table", async (req, res, next) => {
     const keys = Object.keys(req.body || {}).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key) && key !== "id");
     const parsed = parseFilters(req.query as Record<string, unknown>);
     if (ownerColumn && !admin) {
-      parsed.filters.push(`"${ownerColumn}" = ?`);
+      parsed.filters.push(`\`${ownerColumn}\` = ?`);
       parsed.params.push(req.authUser!.id);
     }
     const params = [...keys.map((key) => req.body[key]), ...parsed.params];
@@ -265,7 +265,7 @@ router.patch("/data/:table", async (req, res, next) => {
       return;
     }
     await query(
-      `UPDATE "${table}" SET ${keys.map((key) => `"${key}" = ?`).join(", ")} WHERE ${parsed.filters.join(" AND ")}`,
+      `UPDATE \`${table}\` SET ${keys.map((key) => `\`${key}\` = ?`).join(", ")} WHERE ${parsed.filters.join(" AND ")}`,
       params,
     );
     res.json({ data: null, error: null });
@@ -285,14 +285,14 @@ router.delete("/data/:table", async (req, res, next) => {
     if (ADMIN_WRITE_TABLES.has(table) && !admin) return forbidden(res);
     const parsed = parseFilters(req.query as Record<string, unknown>);
     if (ownerColumn && !admin) {
-      parsed.filters.push(`"${ownerColumn}" = ?`);
+      parsed.filters.push(`\`${ownerColumn}\` = ?`);
       parsed.params.push(req.authUser!.id);
     }
     if (!parsed.filters.length) {
       res.status(400).json({ error: "Delete requires a filter" });
       return;
     }
-    await query(`DELETE FROM "${table}" WHERE ${parsed.filters.join(" AND ")}`, parsed.params);
+    await query(`DELETE FROM \`${table}\` WHERE ${parsed.filters.join(" AND ")}`, parsed.params);
     res.json({ data: null, error: null });
   } catch (err) {
     next(err);
@@ -338,7 +338,7 @@ router.post("/functions/:name", optionalAuth, async (req, res) => {
   if (req.params.name === "convention-public-config") {
     try {
       const rows = await query<{ value: unknown }[]>(
-        `SELECT "value" FROM "app_settings" WHERE "key" = 'flutterwave' LIMIT 1`,
+        "SELECT `value` FROM `app_settings` WHERE `key` = 'flutterwave' LIMIT 1",
       );
       let publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY || "";
       if (rows[0]?.value) {
