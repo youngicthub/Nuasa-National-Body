@@ -195,19 +195,6 @@ const BlogPost = () => {
               animate={{ opacity: 1, x: 0 }}
               className="lg:col-span-4 space-y-6"
             >
-              <div className="bg-card rounded-2xl border border-border p-6 sticky top-24">
-                <h2 className="font-semibold text-foreground mb-4">About the Author</h2>
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                    <User className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{post.author_name}</p>
-                    <p className="text-sm text-muted-foreground">NUASA Contributor</p>
-                  </div>
-                </div>
-              </div>
-
               {relatedPosts && relatedPosts.length > 0 && (
                 <div className="bg-card rounded-2xl border border-border p-6">
                   <h2 className="font-semibold text-foreground mb-4">Related Articles</h2>

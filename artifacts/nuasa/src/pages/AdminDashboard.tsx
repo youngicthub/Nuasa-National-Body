@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -59,22 +60,8 @@ const AdminDashboard = () => {
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const [users, resources, posts, downloads] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("library_resources").select("id", { count: "exact", head: true }),
-        supabase.from("blog_posts").select("id", { count: "exact", head: true }),
-        supabase.from("library_resources").select("download_count"),
-      ]);
-      const totalDownloads = (downloads.data || []).reduce(
-        (sum, r) => sum + (r.download_count || 0),
-        0
-      );
-      return {
-        users: users.count || 0,
-        resources: resources.count || 0,
-        posts: posts.count || 0,
-        downloads: totalDownloads,
-      };
+      const result = await apiFetch<{ data: { users: number; resources: number; posts: number; downloads: number }; error: null }>("/admin/stats");
+      return result.data;
     },
   });
 
@@ -94,13 +81,8 @@ const AdminDashboard = () => {
   const { data: recentPosts, isLoading: postsLoading } = useQuery({
     queryKey: ["admin-recent-posts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("blog_posts")
-        .select("id, title, views, status")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return data;
+      const result = await apiFetch<{ data: { id: string; title: string; views: number; status: string }[]; error: null }>("/admin/posts?limit=5");
+      return result.data;
     },
   });
 
@@ -168,25 +150,28 @@ const AdminDashboard = () => {
 
   const handleDeletePost = async (id: string) => {
     if (!confirm("Delete this post?")) return;
-    const { error } = await supabase.from("blog_posts").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Post deleted");
-    queryClient.invalidateQueries({ queryKey: ["admin-recent-posts"] });
-    queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    try {
+      await apiFetch(`/admin/posts/${id}`, { method: "DELETE" });
+      toast.success("Post deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin-recent-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete post");
+    }
   };
 
   const handleTogglePostStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === "published" ? "draft" : "published";
-    const { error } = await supabase
-      .from("blog_posts")
-      .update({
-        status: newStatus,
-        published_at: newStatus === "published" ? new Date().toISOString() : null,
-      })
-      .eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(newStatus === "published" ? "Post published — now visible to users" : "Post unpublished — hidden from users");
-    queryClient.invalidateQueries({ queryKey: ["admin-recent-posts"] });
+    try {
+      await apiFetch(`/admin/posts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      toast.success(newStatus === "published" ? "Post published — now visible to users" : "Post unpublished — hidden from users");
+      queryClient.invalidateQueries({ queryKey: ["admin-recent-posts"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update post status");
+    }
   };
 
   const handleDeleteResource = async (id: string) => {

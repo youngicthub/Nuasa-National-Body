@@ -14,7 +14,7 @@ router.get("/posts", async (req, res, next) => {
       SELECT bp.*,
              c.name  AS category_name,
              c.slug  AS category_slug,
-             COALESCE(p.full_name, 'Admin') AS author_name
+             COALESCE(p.full_name, 'NUASA') AS author_name
       FROM   blog_posts bp
       LEFT JOIN categories c ON c.id = bp.category_id
       LEFT JOIN profiles   p ON p.user_id = bp.author_id
@@ -39,7 +39,7 @@ router.get("/posts/:slug", async (req, res, next) => {
       `SELECT bp.*,
               c.name  AS category_name,
               c.slug  AS category_slug,
-              COALESCE(p.full_name, 'Admin') AS author_name
+              COALESCE(p.full_name, 'NUASA') AS author_name
        FROM   blog_posts bp
        LEFT JOIN categories c ON c.id = bp.category_id
        LEFT JOIN profiles   p ON p.user_id = bp.author_id

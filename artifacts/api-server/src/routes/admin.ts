@@ -116,4 +116,97 @@ router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, nex
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOG POSTS (admin)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/posts?limit=N
+ * Lists all posts (any status) newest-first, with view counts and author name.
+ */
+router.get("/admin/posts", requireAdmin, async (req, res, next) => {
+  try {
+    const parsedLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 0;
+    const limitClause = limit ? ` LIMIT ${limit}` : "";
+    const rows = await query<any[]>(`
+      SELECT bp.id, bp.title, bp.slug, bp.status, bp.views,
+             bp.published_at, bp.created_at,
+             COALESCE(p.full_name, 'NUASA') AS author_name
+      FROM   blog_posts bp
+      LEFT JOIN profiles p ON p.user_id = bp.author_id
+      ORDER  BY bp.created_at DESC
+      ${limitClause}
+    `);
+    res.json({ data: rows, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /api/admin/posts/:id
+ * Updates post status (published/draft) and sets published_at accordingly.
+ */
+router.patch("/admin/posts/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { status } = req.body ?? {};
+    if (!["published", "draft"].includes(status)) {
+      res.status(400).json({ error: "status must be 'published' or 'draft'" });
+      return;
+    }
+    const publishedAt = status === "published" ? new Date().toISOString().slice(0, 19).replace("T", " ") : null;
+    await query(
+      "UPDATE blog_posts SET status = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [status, publishedAt, req.params.id],
+    );
+    res.json({ data: { id: req.params.id, status }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/admin/posts/:id
+ * Deletes a blog post.
+ */
+router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
+  try {
+    await query("DELETE FROM blog_posts WHERE id = ?", [req.params.id]);
+    res.json({ data: { deleted: true }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD STATS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/stats
+ * Returns aggregate counts for the dashboard.
+ */
+router.get("/admin/stats", requireAdmin, async (_req, res, next) => {
+  try {
+    const [users, resources, posts, downloads] = await Promise.all([
+      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM profiles"),
+      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM library_resources"),
+      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM blog_posts"),
+      query<{ total: number }[]>("SELECT COALESCE(SUM(download_count), 0) AS total FROM library_resources"),
+    ]);
+    res.json({
+      data: {
+        users: users[0]?.cnt ?? 0,
+        resources: resources[0]?.cnt ?? 0,
+        posts: posts[0]?.cnt ?? 0,
+        downloads: downloads[0]?.total ?? 0,
+      },
+      error: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
