@@ -6,3 +6,10 @@ id = "eMpHQPGlKGqaRCFXgPFib"
 uri = "file://nuasa_database_export.sql"
 type = "unspecified"
 title = "NUASA Database Export (MySQL)"
+
+[[outputs]]
+id = "Lot82zeTf9fVUW37EYQbF"
+uri = "file://nuasa-frontend-dist.zip"
+type = "unspecified"
+title = "NUASA Frontend Dist"
+description = "Production build of the NUASA frontend — extract and upload the contents of dist/public/ to your web host's public directory."

@@ -61,7 +61,7 @@ const AdminSettings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [newResourceAlerts, setNewResourceAlerts]   = useState(true);
   const [theme, setTheme]                           = useState<"light" | "dark" | "system">(
-    (localStorage.getItem("nuasa-theme") as "light" | "dark" | "system") || "system",
+    (localStorage.getItem("nuasa-theme") as "light" | "dark" | "system") || "light",
   );
 
   // ── Flutterwave ───────────────────────────────────────────────────────────────
