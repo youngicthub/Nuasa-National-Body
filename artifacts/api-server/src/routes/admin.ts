@@ -189,11 +189,14 @@ router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
  */
 router.get("/admin/stats", requireAdmin, async (_req, res, next) => {
   try {
-    const [users, resources, posts, downloads] = await Promise.all([
-      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM profiles"),
+    const [users, resources, posts, downloads, conventionRevenue] = await Promise.all([
+      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM convention_registrations"),
       query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM library_resources"),
       query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM blog_posts"),
       query<{ total: number }[]>("SELECT COALESCE(SUM(download_count), 0) AS total FROM library_resources"),
+      query<{ total: number }[]>(
+        "SELECT COALESCE(SUM(CASE WHEN amount IS NOT NULL THEN amount ELSE 0 END), 0) AS total FROM convention_registrations WHERE payment_status = 'successful'"
+      ),
     ]);
     res.json({
       data: {
@@ -201,6 +204,7 @@ router.get("/admin/stats", requireAdmin, async (_req, res, next) => {
         resources: resources[0]?.cnt ?? 0,
         posts: posts[0]?.cnt ?? 0,
         downloads: downloads[0]?.total ?? 0,
+        conventionRevenue: conventionRevenue[0]?.total ?? 0,
       },
       error: null,
     });

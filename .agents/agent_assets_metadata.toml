@@ -11,8 +11,8 @@ title = "NUASA Database Export (MySQL)"
 id = "Lot82zeTf9fVUW37EYQbF"
 uri = "file://nuasa-frontend-dist.zip"
 type = "unspecified"
-title = "NUASA Frontend — Production Build"
-description = "Complete production build (dist) ready to deploy on your static host. After uploading, edit config.js and set window.__NUASA_API_URL__ to your Replit API URL (e.g. https://your-api.replit.app/api)."
+title = "NUASA Frontend — Updated Build"
+description = "Updated production build with corrected dashboard stats. Upload to your host and set window.__NUASA_API_URL__ in config.js."
 
 [[outputs]]
 id = "wuv3wEcQbksV3vGAxIn8S"

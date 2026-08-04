@@ -60,7 +60,7 @@ const AdminDashboard = () => {
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const result = await apiFetch<{ data: { users: number; resources: number; posts: number; downloads: number }; error: null }>("/admin/stats");
+      const result = await apiFetch<{ data: { users: number; resources: number; posts: number; downloads: number; conventionRevenue: number }; error: null }>("/admin/stats");
       return result.data;
     },
   });
@@ -194,7 +194,8 @@ const AdminDashboard = () => {
   };
 
   const statCards = [
-    { label: "Total Users", value: stats?.users ?? 0, icon: Users, color: "text-blue-500" },
+    { label: "Total Registrations", value: stats?.users ?? 0, icon: Users, color: "text-blue-500" },
+    { label: "Convention Revenue (NGN)", value: (stats?.conventionRevenue ?? 0).toLocaleString(), icon: Download, color: "text-emerald-500" },
     { label: "Resources", value: stats?.resources ?? 0, icon: BookOpen, color: "text-green-500" },
     { label: "Blog Posts", value: stats?.posts ?? 0, icon: FileText, color: "text-purple-500" },
     { label: "Downloads", value: stats?.downloads ?? 0, icon: Download, color: "text-orange-500" },
