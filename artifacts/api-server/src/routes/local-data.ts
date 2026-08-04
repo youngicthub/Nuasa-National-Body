@@ -176,11 +176,44 @@ router.post("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
     const ownerColumn = OWNED_TABLES[table];
+
+    // ── Auto-create user account for unauthenticated convention registrations ──
+    if (table === "convention_registrations" && !req.authUser) {
+      const body = Array.isArray(req.body) ? req.body[0] : req.body;
+      const email = (body?.email || "").toLowerCase().trim();
+      if (!email) {
+        res.status(400).json({ data: null, error: { message: "Email is required for convention registration." } });
+        return;
+      }
+      let existing = await query<{ id: string }[]>("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
+      let userId: string;
+      if (existing.length > 0) {
+        userId = existing[0].id;
+      } else {
+        userId = crypto.randomUUID();
+        const passwordHash = await bcrypt.hash("123456", 12);
+        await query(
+          "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+          [userId, email, passwordHash],
+        );
+        await query(
+          "INSERT INTO profiles (id, user_id, full_name, email, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+          [crypto.randomUUID(), userId, body?.full_name || "Convention Registrant", email],
+        );
+        await query(
+          "INSERT INTO user_roles (id, user_id, role, created_at) VALUES (?, ?, 'user', CURRENT_TIMESTAMP)",
+          [crypto.randomUUID(), userId],
+        );
+      }
+      req.authUser = { id: userId, email, role: "user" };
+    }
+
     const anonInsert = ANON_INSERT_TABLES.has(table);
     if (!anonInsert) {
       if (!ensureAuth(req, res)) return;
       if (ADMIN_WRITE_TABLES.has(table) && !isAdmin(req)) return forbidden(res);
     }
+
     const records = Array.isArray(req.body) ? req.body : [req.body];
     if (table === "convention_registrations") {
       if (records.length !== 1) {

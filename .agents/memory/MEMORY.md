@@ -1,4 +1,5 @@
 - [NUASA migration - Supabase kept](nuasa-supabase-kept.md) — App kept Supabase connection; replacing with Replit primitives is a separate task.
+- [Neon schema vs app schema mismatch](neon-schema-mismatch.md) — Neon DB has old Supabase schema; several convention_registrations and site_visits columns had to be added manually.
 - [MySQL 8.0 undo tablespace fix (Nix)](mysql-undo-restart-fix.md) — Always delete undo_* from datadir before every mysqld start; 8.0.42 on Nix recreates them on every boot and crashes if they exist.
 - [Lovable migration CSS fix](lovable-css-fix.md) — Lovable apps use @import before @tailwind; copy script doesn't fix this.
 - [Artifact workflows](artifact-workflows.md) — Use artifact-managed service workflows as canonical; remove duplicate legacy workflows after artifact registration.

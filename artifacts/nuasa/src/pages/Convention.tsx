@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Loader2, Printer, CheckCircle2, Calendar, MapPin, Users, Download, PartyPopper, LogIn } from "lucide-react";
+import { Loader2, Printer, CheckCircle2, Calendar, MapPin, Users, Download, PartyPopper } from "lucide-react";
 import jsPDF from "jspdf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -128,7 +128,6 @@ const loadFlutterwave = () =>
 
 const Convention = () => {
   const { user, profile } = useAuth();
-  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [type, setType] = useState<"student" | "graduate" | "chapter">("student");
@@ -220,7 +219,6 @@ const Convention = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) { navigate("/login"); return; }
     if (!publicKey) { toast.error("Payments not configured. Please contact admin."); return; }
     if (!fullName || !email || !phone) { toast.error("Please fill all required fields"); return; }
     if (type === "student" && !breakoutSession) { toast.error("Please select a breakout session"); return; }
@@ -250,7 +248,7 @@ const Convention = () => {
       const reference_code = `NUASA-${type.toUpperCase().slice(0, 3)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
       const insertPayload: any = {
-        user_id: user.id,
+        user_id: user?.id,
         registration_type: type,
         full_name: fullName,
         email,
@@ -547,27 +545,7 @@ const Convention = () => {
           <h2 className="font-serif text-2xl font-bold mb-1">Register</h2>
           <p className="text-sm text-muted-foreground mb-6">Choose your registration type and complete payment via Flutterwave.</p>
 
-          {!user ? (
-            <div className="flex flex-col items-center justify-center py-14 gap-5 text-center">
-              <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
-                <LogIn className="w-8 h-8 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-serif text-xl font-bold mb-1">Sign in to register</h3>
-                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                  You need a NUASA account to register for the convention. Sign in or create a free account to continue.
-                </p>
-              </div>
-              <div className="flex gap-3 flex-wrap justify-center">
-                <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  <Link to="/login?redirect=/convention">Sign in</Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link to="/register?redirect=/convention">Create account</Link>
-                </Button>
-              </div>
-            </div>
-          ) : registrations?.some((r) => r.payment_status === "successful") ? (
+          {registrations?.some((r) => r.payment_status === "successful") ? (
             <div className="flex flex-col items-center justify-center py-14 gap-5 text-center">
               <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8 text-accent" />
