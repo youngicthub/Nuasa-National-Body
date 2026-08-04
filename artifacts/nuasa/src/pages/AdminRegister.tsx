@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
 
 const AdminRegister = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAlreadyAdmin = (user as any)?.role === "admin";
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,12 +38,19 @@ const AdminRegister = () => {
       return;
     }
 
+    // If not already an admin, require the access token
+    if (!isAlreadyAdmin && !formData.accessToken.trim()) {
+      toast.error("Admin Access Token is required");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/admin-signup", {
+      // apiFetch automatically attaches the JWT token in Authorization header,
+      // which the backend accepts as an alternative to the ADMIN_SIGNUP_SECRET.
+      await apiFetch("/auth/admin-signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
@@ -48,18 +60,10 @@ const AdminRegister = () => {
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || "Failed to create admin account");
-        setIsLoading(false);
-        return;
-      }
-
-      toast.success("Admin account created successfully! You can now sign in.");
+      toast.success("Admin account created successfully! They can now sign in.");
       navigate("/admin/login");
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (err: any) {
+      toast.error(err.message?.replace(/^API \d+:\s*/, "") || "Failed to create admin account");
       setIsLoading(false);
     }
   };
@@ -80,7 +84,9 @@ const AdminRegister = () => {
               Admin Registration
             </h1>
             <p className="text-sm text-muted-foreground">
-              Request administrative access to NUASA platform
+              {isAlreadyAdmin
+                ? "Create a new admin account (you are already an admin)"
+                : "Request administrative access to NUASA platform"}
             </p>
           </div>
 
@@ -157,25 +163,35 @@ const AdminRegister = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="accessToken">Admin Access Token</Label>
-              <div className="relative">
-                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="accessToken"
-                  type="password"
-                  placeholder="Enter NUASA admin access token"
-                  value={formData.accessToken}
-                  onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
+            {/* Admin Access Token — not required when the requesting user is already an admin */}
+            {!isAlreadyAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="accessToken">Admin Access Token</Label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="accessToken"
+                    type="password"
+                    placeholder="Enter NUASA admin access token"
+                    value={formData.accessToken}
+                    onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
+                    className="pl-10"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Required token provided by NUASA leadership.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Required token provided by NUASA leadership.
+            )}
+
+            {isAlreadyAdmin && (
+              <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                <Shield className="inline w-3 h-3 mr-1" />
+                You are logged in as an admin — no access token needed.
               </p>
-            </div>
+            )}
 
             <Button type="submit" className="w-full gap-2" disabled={isLoading}>
               {isLoading ? (

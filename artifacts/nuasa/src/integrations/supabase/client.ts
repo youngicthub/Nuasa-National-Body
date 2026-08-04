@@ -8,7 +8,8 @@ export type Session = { access_token: string; user: LocalUser };
 export type User = LocalUser;
 
 // See src/lib/api.ts for why this is configurable rather than hardcoded.
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+import { getApiBase } from "@/lib/api";
+const API_BASE = getApiBase();
 const TOKEN_KEY = "nuasa_local_access_token";
 const listeners = new Set<(event: string, session: Session | null) => void>();
 

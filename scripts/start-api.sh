@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start-api.sh — starts MySQL then the API server (both owned by this process)
+# start-api.sh — starts MySQL (if not using Neon) then the API server
 set -euo pipefail
 
 # ── Base URL auto-detection ───────────────────────────────────────────────────
@@ -10,6 +10,17 @@ else
 fi
 echo "[start-api] FRONTEND_URL=${FRONTEND_URL}"
 
+# ── If Neon database URL is configured, skip MySQL entirely ───────────────────
+if [ -n "${NEON_DATABASE_URL:-}" ]; then
+  echo "[start-api] NEON_DATABASE_URL detected — skipping MySQL, using Neon PostgreSQL"
+  cd /home/runner/workspace/artifacts/api-server
+  echo "[start-api] Building API server..."
+  npm run build
+  echo "[start-api] Starting API server..."
+  exec node --enable-source-maps ./dist/index.mjs
+fi
+
+# ── MySQL path (local development fallback) ───────────────────────────────────
 MYSQL_DATADIR="/home/runner/.mysql-data"
 MYSQL_RUNDIR="/home/runner/.mysql-run"
 MYSQL_SOCK="$MYSQL_RUNDIR/mysqld.sock"
@@ -19,9 +30,6 @@ DB_NAME="${DB_NAME:-nuasa_database}"
 DB_USER="${DB_USER:-nuasa_user}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 
-# NOTE: No --innodb-undo-directory. Keeping everything in datadir avoids the
-# "Can't create UNDO tablespace / Could not find tablespace ID" crash cycle
-# that occurs when init and start use different undo-directory settings.
 MYSQLD_ARGS=(
   --datadir="$MYSQL_DATADIR"
   --basedir="$MYSQL_BASEDIR"
@@ -36,7 +44,6 @@ MYSQLD_ARGS=(
 
 mkdir -p "$MYSQL_DATADIR" "$MYSQL_RUNDIR"
 
-# ── 1. Initialize data directory once ────────────────────────────────────────
 if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
   echo "[start-api] Initializing MySQL data directory..."
   rm -f "$MYSQL_DATADIR/is_writable" "$MYSQL_DATADIR/is_readable" \
@@ -49,15 +56,9 @@ if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
   echo "[start-api] Init complete"
 fi
 
-# ── 2. Clean up before each start ────────────────────────────────────────────
 rm -f "$MYSQL_SOCK" "$MYSQL_RUNDIR/mysqld.sock.lock" "$MYSQL_RUNDIR/mysqld.pid"
-# MySQL 8.0.42 on this Nix build runs srv_undo_tablespaces_create() on EVERY
-# startup and aborts if undo files already exist.  After a clean shutdown the
-# undo logs are empty, so deleting them here lets mysqld recreate them with
-# the same fixed space-IDs (4294967294 / 4294967293) each time.
 rm -f "$MYSQL_DATADIR"/undo_*
 
-# ── 3. Launch mysqld in the background ───────────────────────────────────────
 echo "[start-api] Starting mysqld..."
 mysqld "${MYSQLD_ARGS[@]}" &
 MYSQLD_PID=$!
@@ -71,7 +72,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# ── 4. Wait for mysqld to be ready (up to 30 s) ──────────────────────────────
 echo "[start-api] Waiting for MySQL..."
 for i in $(seq 1 30); do
   if mysqladmin --socket="$MYSQL_SOCK" ping --silent 2>/dev/null; then
@@ -91,7 +91,6 @@ for i in $(seq 1 30); do
   fi
 done
 
-# ── 5. One-time DB / user / schema setup ─────────────────────────────────────
 SETUP_MARKER="$MYSQL_RUNDIR/.db_setup_done"
 if [ ! -f "$SETUP_MARKER" ]; then
   echo "[start-api] Running first-time DB setup..."
@@ -121,7 +120,6 @@ SQL
   echo "[start-api] DB setup complete"
 fi
 
-# ── 6. Build and start the API server ────────────────────────────────────────
 cd /home/runner/workspace/artifacts/api-server
 echo "[start-api] Building API server..."
 npm run build

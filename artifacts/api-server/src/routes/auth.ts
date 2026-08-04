@@ -3,14 +3,9 @@ import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { query } from "../lib/db";
-import { issueToken, optionalAuth } from "../middleware/auth";
+import { issueToken, optionalAuth, readAuth } from "../middleware/auth";
 
 const router = Router();
-
-// ─── Rate limiting ─────────────────────────────────────────────────────────────
-// Credential-guessing targets (login, admin-signup secret) get a tight
-// per-IP limit. Account-creation / email-triggering endpoints get a looser
-// one, mainly to stop mailbox-bombing and account-creation spam.
 
 const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -27,8 +22,6 @@ const looseLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many attempts. Please try again later." },
 });
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function publicUser(row: any) {
   return {
@@ -60,13 +53,12 @@ async function sendMail(to: string, subject: string, text: string, html?: string
 async function issueVerificationToken(userId: string): Promise<string> {
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-  // Invalidate any unused previous verification tokens for this user
   await query(
     "UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND token_type = 'email_verification' AND used_at IS NULL",
     [userId],
   );
   await query(
-    "INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, ?, 'email_verification', DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR), CURRENT_TIMESTAMP)",
+    "INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, ?, 'email_verification', NOW() + INTERVAL '24 hours', CURRENT_TIMESTAMP)",
     [crypto.randomUUID(), userId, tokenHash],
   );
   return rawToken;
@@ -89,7 +81,7 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
     const id = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
     await query(
-      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
       [id, email.toLowerCase(), passwordHash],
     );
     await query(
@@ -101,7 +93,6 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
       [crypto.randomUUID(), id],
     );
 
-    // Send verification email
     try {
       const rawToken = await issueVerificationToken(id);
       const origin = process.env.FRONTEND_URL || process.env.APP_ORIGIN || "http://localhost";
@@ -114,12 +105,10 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
           `<p>Welcome to NUASA!</p><p>Please verify your email address: <a href="${link}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
         );
       } else {
-        // Log token to console in development when SMTP is not configured
         console.info("[auth] Email verification token (no SMTP configured):", rawToken);
       }
     } catch (emailErr) {
       console.error("[auth] Failed to send verification email:", emailErr);
-      // Do not fail signup if email fails
     }
 
     const user = { id, email: email.toLowerCase(), role: "user" as const, full_name: metadata.full_name || "User" };
@@ -135,16 +124,21 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
   }
 });
 
-// ─── Admin sign-up ───────────────────────────────────────────────────────────
-// Requires ADMIN_SIGNUP_SECRET from the request body — validated server-side only.
+// ─── Admin sign-up ────────────────────────────────────────────────────────────
+// Accepts EITHER:
+//  (a) ADMIN_SIGNUP_SECRET in the request body `secret` field, OR
+//  (b) A valid admin JWT token in the Authorization header
 
 router.post("/admin-signup", strictLimiter, async (req, res, next) => {
   try {
     const { email, password, full_name, secret } = req.body ?? {};
 
-    // Validate the server-side secret
+    // Allow existing admins (via JWT) to create new admins without needing the secret
+    const authUser = readAuth(req);
+    const hasAdminToken = authUser?.role === "admin";
     const adminSecret = process.env.ADMIN_SIGNUP_SECRET;
-    if (!adminSecret || !secret || secret !== adminSecret) {
+
+    if (!hasAdminToken && (!adminSecret || !secret || secret !== adminSecret)) {
       res.status(403).json({ error: "Invalid admin signup secret" });
       return;
     }
@@ -163,7 +157,7 @@ router.post("/admin-signup", strictLimiter, async (req, res, next) => {
     const id = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
     await query(
-      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
       [id, email.toLowerCase(), passwordHash],
     );
     await query(
@@ -259,7 +253,7 @@ router.get("/me", optionalAuth, async (req, res) => {
   res.json({ profile: rows[0] || null, role: req.authUser.role });
 });
 
-// ─── Change password (authenticated) ─────────────────────────────────────────
+// ─── Change password ──────────────────────────────────────────────────────────
 
 router.post("/password", optionalAuth, async (req, res, next) => {
   try {
@@ -286,7 +280,6 @@ router.post("/reset-password", looseLimiter, async (req, res, next) => {
   try {
     const { email, token, password } = req.body ?? {};
 
-    // Step 2: consume token and set new password
     if (token && password) {
       if (typeof password !== "string" || password.length < 8) {
         res.status(400).json({ error: "Password must be at least 8 characters" });
@@ -308,7 +301,6 @@ router.post("/reset-password", looseLimiter, async (req, res, next) => {
       return;
     }
 
-    // Step 1: request a reset email
     if (!email) {
       res.status(400).json({ error: "Email is required" });
       return;
@@ -317,13 +309,12 @@ router.post("/reset-password", looseLimiter, async (req, res, next) => {
     if (users[0]) {
       const rawToken = crypto.randomBytes(32).toString("hex");
       const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-      // Invalidate previous reset tokens
       await query(
         "UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND token_type = 'password_reset' AND used_at IS NULL",
         [users[0].id],
       );
       await query(
-        "INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, ?, 'password_reset', DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 60 MINUTE), CURRENT_TIMESTAMP)",
+        "INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, ?, 'password_reset', NOW() + INTERVAL '60 minutes', CURRENT_TIMESTAMP)",
         [crypto.randomUUID(), users[0].id, tokenHash],
       );
       const origin = process.env.FRONTEND_URL || process.env.APP_ORIGIN || "http://localhost";
@@ -332,14 +323,13 @@ router.post("/reset-password", looseLimiter, async (req, res, next) => {
         await sendMail(
           String(email),
           "NUASA password reset",
-          `Reset your password:\n\n${link}\n\nThis link expires in 60 minutes. If you did not request this, ignore this email.`,
+          `Reset your password:\n\n${link}\n\nThis link expires in 60 minutes.`,
           `<p>Reset your NUASA password: <a href="${link}">Reset Password</a></p><p>This link expires in 60 minutes.</p>`,
         );
       } else {
-        console.info("[auth] Password reset token (no SMTP configured):", rawToken);
+        console.info("[auth] Password reset token (no SMTP):", rawToken);
       }
     }
-    // Always return success to avoid email enumeration
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -348,7 +338,6 @@ router.post("/reset-password", looseLimiter, async (req, res, next) => {
 
 // ─── Email verification ───────────────────────────────────────────────────────
 
-// POST — used by frontend fetch calls
 router.post("/verify-email", async (req, res, next) => {
   try {
     const tokenHash = crypto.createHash("sha256").update(String(req.body?.token || "")).digest("hex");
@@ -360,7 +349,7 @@ router.post("/verify-email", async (req, res, next) => {
       res.status(400).json({ error: "Verification link is invalid or expired" });
       return;
     }
-    await query("UPDATE users SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].user_id]);
+    await query("UPDATE users SET email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].user_id]);
     await query("UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].id]);
     res.json({ success: true });
   } catch (err) {
@@ -368,7 +357,6 @@ router.post("/verify-email", async (req, res, next) => {
   }
 });
 
-// GET — used when the user clicks the email link directly
 router.get("/verify-email", async (req, res, next) => {
   try {
     const token = String(req.query.token || "");
@@ -386,15 +374,13 @@ router.get("/verify-email", async (req, res, next) => {
       res.redirect(`${origin}/verify-email?status=invalid`);
       return;
     }
-    await query("UPDATE users SET email_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].user_id]);
+    await query("UPDATE users SET email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].user_id]);
     await query("UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].id]);
     res.redirect(`${origin}/verify-email?status=success`);
   } catch (err) {
     next(err);
   }
 });
-
-// ─── Resend verification email ────────────────────────────────────────────────
 
 router.post("/resend-verification", looseLimiter, async (req, res, next) => {
   try {
@@ -422,21 +408,17 @@ router.post("/resend-verification", looseLimiter, async (req, res, next) => {
         console.info("[auth] Resend verification token (no SMTP):", rawToken);
       }
     }
-    // Always return success to avoid email enumeration
     res.json({ success: true });
   } catch (err) {
     next(err);
   }
 });
 
-// ─── Admin: delete a user (admin-only) ───────────────────────────────────────
+// ─── Admin: delete a user ─────────────────────────────────────────────────────
 
 router.delete("/users/:id", async (req, res, next) => {
   try {
-    const { requireAdmin } = await import("../middleware/auth");
-    // Inline admin check (avoid middleware import cycle)
-    const { readAuth } = await import("../middleware/auth");
-    const authUser = readAuth(req as any);
+    const authUser = readAuth(req);
     if (!authUser || authUser.role !== "admin") {
       res.status(403).json({ error: "Administrator access required" });
       return;
@@ -446,7 +428,6 @@ router.delete("/users/:id", async (req, res, next) => {
       res.status(400).json({ error: "Cannot delete your own account" });
       return;
     }
-    // Delete in dependency order
     await query("DELETE FROM auth_tokens WHERE user_id = ?", [targetId]);
     await query("DELETE FROM saved_posts WHERE user_id = ?", [targetId]);
     await query("DELETE FROM saved_resources WHERE user_id = ?", [targetId]);
@@ -465,4 +446,3 @@ router.delete("/users/:id", async (req, res, next) => {
 });
 
 export default router;
-

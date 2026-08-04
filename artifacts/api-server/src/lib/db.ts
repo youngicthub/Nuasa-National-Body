@@ -1,27 +1,37 @@
-import mysql from "mysql2/promise";
+import { Pool } from "pg";
 
-const MYSQL_SOCK = "/home/runner/.mysql-run/mysqld.sock";
+// Strip channel_binding which node-postgres doesn't support
+const connStr = (process.env.NEON_DATABASE_URL || "").replace(/[?&]channel_binding=[^&]*/g, (m) =>
+  m.startsWith("?") ? "?" : ""
+);
 
-export const pool = mysql.createPool({
-  socketPath: MYSQL_SOCK,
-  database: process.env.DB_NAME || "nuasa_database",
-  user: process.env.DB_USER || "nuasa_user",
-  password: process.env.DB_PASSWORD || "",
-  waitForConnections: true,
-  connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
-  queueLimit: 0,
+export const pool = new Pool({
+  connectionString: connStr || undefined,
+  // Fallback to individual env vars if NEON_DATABASE_URL is not set
+  ...(connStr ? {} : {
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.DB_PORT || 5432),
+    database: process.env.DB_NAME || "nuasa_database",
+    user: process.env.DB_USER || "nuasa_user",
+    password: process.env.DB_PASSWORD || "",
+  }),
+  ssl: connStr ? { rejectUnauthorized: false } : false,
+  max: Number(process.env.DB_CONNECTION_LIMIT || 10),
 });
 
 /**
- * Run a SQL query against the MySQL database.
- * Uses native `?` placeholders (mysql2 style).
+ * Run a SQL query against the PostgreSQL database.
+ * Converts MySQL-style `?` placeholders to PostgreSQL `$1, $2, ...` automatically.
  */
 export async function query<T = unknown[]>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T> {
-  const [rows] = await pool.execute(sql, params);
-  return rows as T;
+  // Convert MySQL-style ? to PostgreSQL $1, $2, ...
+  let idx = 0;
+  const pgSql = sql.replace(/\?/g, () => `$${++idx}`);
+  const result = await pool.query(pgSql, params);
+  return result.rows as T;
 }
 
 export async function closeDatabase() {

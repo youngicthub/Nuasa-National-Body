@@ -1,15 +1,22 @@
 /**
  * Thin fetch wrapper for the NUASA API server.
- * The API server is served at /api on the same domain.
  *
- * Automatically attaches the JWT bearer token from localStorage when present,
- * so authenticated endpoints (admin, user data) work without extra boilerplate.
+ * API base URL resolution priority:
+ *  1. window.__NUASA_API_URL__ — set in /public/config.js at runtime (edit on GO54)
+ *  2. VITE_API_URL             — baked in at build time
+ *  3. "/api"                   — same-origin relative (local dev, same-domain production)
  */
-// VITE_API_URL lets the frontend and API server live on different origins
-// (e.g. separate cPanel subdomains). Defaults to a same-origin relative
-// path, which is what local dev (via the Vite proxy) and same-origin
-// production deploys both want.
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+declare global {
+  interface Window { __NUASA_API_URL__?: string }
+}
+
+export function getApiBase(): string {
+  if (typeof window !== "undefined" && window.__NUASA_API_URL__) {
+    return window.__NUASA_API_URL__;
+  }
+  return import.meta.env.VITE_API_URL || "/api";
+}
+
 const TOKEN_KEY = "nuasa_local_access_token";
 
 export function getAuthToken(): string | null {
@@ -25,12 +32,12 @@ export async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getAuthToken();
+  const API_BASE = getApiBase();
 
   const headers = new Headers(options.headers);
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  // Don't set Content-Type for FormData — browser sets it with the boundary
   if (
     options.body &&
     !(options.body instanceof FormData) &&
