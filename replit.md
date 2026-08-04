@@ -26,7 +26,7 @@ The Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests
 
 **Install dependencies** (run once after cloning or if node_modules is missing):
 ```bash
-npm install
+pnpm install
 ```
 
 ### On your local machine (single command)
