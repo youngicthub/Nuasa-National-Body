@@ -18,5 +18,5 @@ description = "Upload the contents of this ZIP to your hosting platform web root
 id = "wuv3wEcQbksV3vGAxIn8S"
 uri = "file://frontend-dist.zip"
 type = "unspecified"
-title = "NUASA Frontend — Production Build"
-description = "Built frontend ready for hosting on GO54 (or any static host). Extract and upload the contents of artifacts/nuasa/dist/public/ to your web host root."
+title = "NUASA Frontend — Clean Production Build"
+description = "Rebuilt frontend with Replit SDK removed and institution field updated to free-text. Extract and upload the contents to your GO54 hosting root."
