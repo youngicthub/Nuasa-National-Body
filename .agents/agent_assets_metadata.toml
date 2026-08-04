@@ -13,3 +13,10 @@ uri = "file://nuasa-frontend-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — Production Build (Updated)"
 description = "Upload the contents of this ZIP to your hosting platform web root. API points to your Replit backend."
+
+[[outputs]]
+id = "wuv3wEcQbksV3vGAxIn8S"
+uri = "file://frontend-dist.zip"
+type = "unspecified"
+title = "NUASA Frontend — Production Build"
+description = "Built frontend ready for hosting on GO54 (or any static host). Extract and upload the contents of artifacts/nuasa/dist/public/ to your web host root."

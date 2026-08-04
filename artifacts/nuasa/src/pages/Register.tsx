@@ -17,7 +17,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { SEO } from "@/components/SEO";
-import { NIGERIAN_UNIVERSITIES } from "@/data/nigerianUniversities";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -180,23 +179,17 @@ const Register = () => {
             <div className="space-y-2">
               <Label htmlFor="institution">Institution</Label>
               <div className="relative">
-                <School className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-                <Select
+                <School className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="institution"
+                  type="text"
+                  placeholder="Type your university name"
                   value={formData.institution}
-                  onValueChange={(value) => setFormData({ ...formData, institution: value })}
+                  onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
+                  className="pl-10"
+                  required
                   disabled={isLoading}
-                >
-                  <SelectTrigger className="pl-10">
-                    <SelectValue placeholder="Select your university" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {NIGERIAN_UNIVERSITIES.map((uni) => (
-                      <SelectItem key={uni} value={uni}>
-                        {uni}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
             </div>
 
