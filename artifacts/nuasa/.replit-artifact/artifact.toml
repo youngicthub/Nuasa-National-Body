@@ -1,13 +1,10 @@
 kind = "web"
 previewPath = "/"
 title = "NUASA"
+description = "NUASA National Body E-Library & Blog — a full-stack platform for Nigerian accounting students with resources, blog posts, convention registration, and chapter management."
 version = "1.0.0"
 id = "artifacts/nuasa"
 router = "path"
-
-[[integratedSkills]]
-name = "react-vite"
-version = "1.0.0"
 
 [[services]]
 name = "web"
@@ -19,8 +16,8 @@ run = "pnpm --filter @workspace/nuasa run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/nuasa", "run", "build" ]
-publicDir = "artifacts/nuasa/dist/public"
 serve = "static"
+publicDir = "artifacts/nuasa/dist/public"
 
 [[services.production.rewrites]]
 from = "/*"
