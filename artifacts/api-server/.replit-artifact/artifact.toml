@@ -15,7 +15,7 @@ run = "bash /home/runner/workspace/scripts/start-api.sh"
 [services.production]
 
 [services.production.build]
-args = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
+args = ["pnpm", "--filter", "nuasa-api-server", "run", "build"]
 
 [services.production.build.env]
 NODE_ENV = "production"
