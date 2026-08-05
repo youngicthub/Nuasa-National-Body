@@ -1,10 +1,8 @@
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import nuasaLogo from "@/assets/nuasa-logo.jpeg";
 import {
-  BookOpen, FileText, Users, Upload, Settings, LogOut, BarChart3,
-  Calendar, Loader2, Globe, Ticket, Search, Download, Eye, ShieldCheck, RefreshCw,
+  Loader2, Search, Download, Eye, ShieldCheck, RefreshCw, DollarSign,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
@@ -22,6 +20,32 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
 const TYPE_LABEL: Record<string, string> = { student: "Student", graduate: "Graduate", chapter: "Chapter" };
+
+type Registration = {
+  id: string;
+  reference_code: string;
+  tx_ref: string;
+  flw_transaction_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  gender: string;
+  amount: string | number;
+  currency: string;
+  payment_status: string;
+  registration_type: string;
+  institution: string;
+  department: string;
+  matric_number: string;
+  graduation_year: string;
+  chapter_name: string;
+  delegates_count: number;
+  accommodation_request: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  notes: string;
+  created_at: string;
+};
 
 const AdminConvention = () => {
   const navigate = useNavigate();
@@ -32,31 +56,22 @@ const AdminConvention = () => {
   const [typeFilter, setTypeFilter] = useState<"all" | "student" | "graduate" | "chapter">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<Registration | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-convention-regs"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("convention_registrations")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const result = await apiFetch<{ data: Registration[]; error: null }>("/admin/transactions");
+      return result.data;
     },
   });
 
   const { data: loginLog } = useQuery({
     queryKey: ["admin-login-log"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_login_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data;
+      const result = await apiFetch<{ data: { id: string; email: string; user_id: string; user_agent: string; created_at: string }[]; error: null }>("/admin/login-log");
+      return result.data;
     },
   });
 
@@ -64,6 +79,7 @@ const AdminConvention = () => {
     const all = data || [];
     const ok = all.filter(r => r.payment_status === "successful");
     const revenue = ok.reduce((s, r) => s + Number(r.amount), 0);
+    const totalAmount = all.reduce((s, r) => s + Number(r.amount || 0), 0);
     const sumBy = (t: string) =>
       ok.filter(r => r.registration_type === t).reduce((s, r) => s + Number(r.amount), 0);
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -74,6 +90,7 @@ const AdminConvention = () => {
       pending: all.filter(r => r.payment_status === "pending").length,
       failed: all.filter(r => r.payment_status === "failed").length,
       revenue,
+      totalAmount,
       students: ok.filter(r => r.registration_type === "student").length,
       studentsRev: sumBy("student"),
       graduates: ok.filter(r => r.registration_type === "graduate").length,
@@ -107,7 +124,7 @@ const AdminConvention = () => {
     return rows;
   }, [data, search, filter, typeFilter, dateFrom, dateTo]);
 
-  const buildRows = (rows: any[]) => rows.map(r => ({
+  const buildRows = (rows: Registration[]) => rows.map(r => ({
     "Registration ID": r.id,
     "Reference": r.reference_code,
     "Name": r.full_name,
@@ -130,7 +147,7 @@ const AdminConvention = () => {
     "Date": r.created_at,
   }));
 
-  const exportCsv = (rows: any[], name: string) => {
+  const exportCsv = (rows: Registration[], name: string) => {
     const data = buildRows(rows);
     if (!data.length) { toast.error("Nothing to export"); return; }
     const headers = Object.keys(data[0]);
@@ -145,7 +162,7 @@ const AdminConvention = () => {
     URL.revokeObjectURL(url);
   };
 
-  const exportXlsx = (rows: any[], name: string) => {
+  const exportXlsx = (rows: Registration[], name: string) => {
     const data = buildRows(rows);
     if (!data.length) { toast.error("Nothing to export"); return; }
     const ws = XLSX.utils.json_to_sheet(data);
@@ -154,15 +171,15 @@ const AdminConvention = () => {
     XLSX.writeFile(wb, `${name}-${Date.now()}.xlsx`);
   };
 
-  const verifyPayment = async (r: any) => {
+  const verifyPayment = async (r: Registration) => {
     if (!r.flw_transaction_id || !r.tx_ref) { toast.error("No Flutterwave transaction on this record"); return; }
     setVerifying(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke("convention-verify-payment", {
-        body: { transaction_id: r.flw_transaction_id, tx_ref: r.tx_ref },
-      });
-      if (error) throw error;
-      toast.success(`Verified: ${data?.status ?? "ok"}`);
+      const result = await apiFetch<{ data: { success: boolean; status: string }; error: null }>(
+        `/admin/transactions/${r.id}/verify`,
+        { method: "POST" },
+      );
+      toast.success(`Status: ${result.data?.status ?? "manual verification required"}`);
       qc.invalidateQueries({ queryKey: ["admin-convention-regs"] });
     } catch (e: any) {
       toast.error(e.message || "Verification failed");
@@ -173,17 +190,19 @@ const AdminConvention = () => {
 
   const handleLogout = async () => { await signOut(); navigate("/admin/login"); };
 
-  const statCards = [
-    { label: "Total Registrations", value: stats.total },
-    { label: "Successful", value: stats.successful },
-    { label: "Pending", value: stats.pending },
-    { label: "Failed", value: stats.failed },
-    { label: "Today", value: stats.today },
-    { label: "This Month", value: stats.month },
-    { label: "Students (count / NGN)", value: `${stats.students} / ${stats.studentsRev.toLocaleString()}` },
-    { label: "Graduates (count / NGN)", value: `${stats.graduates} / ${stats.graduatesRev.toLocaleString()}` },
-    { label: "Chapters (count / NGN)", value: `${stats.chapters} / ${stats.chaptersRev.toLocaleString()}` },
-    { label: "Total Revenue (NGN)", value: stats.revenue.toLocaleString() },
+  const statusCards = [
+    { label: "Total Registrations", value: stats.total, className: "bg-card" },
+    { label: "Successful", value: stats.successful, className: "bg-green-50 border-green-200 text-green-800" },
+    { label: "Pending", value: stats.pending, className: "bg-yellow-50 border-yellow-200 text-yellow-800" },
+    { label: "Failed", value: stats.failed, className: "bg-red-50 border-red-200 text-red-800" },
+    { label: "Today", value: stats.today, className: "bg-card" },
+    { label: "This Month", value: stats.month, className: "bg-card" },
+  ];
+
+  const typeCards = [
+    { label: "Students", value: `${stats.students}`, sub: `NGN ${stats.studentsRev.toLocaleString()}` },
+    { label: "Graduates", value: `${stats.graduates}`, sub: `NGN ${stats.graduatesRev.toLocaleString()}` },
+    { label: "Chapters", value: `${stats.chapters}`, sub: `NGN ${stats.chaptersRev.toLocaleString()}` },
   ];
 
   return (
@@ -192,7 +211,7 @@ const AdminConvention = () => {
         <AdminSidebar />
 
         <main className="flex-1 ml-64 p-4 md:p-8">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground mb-1">Convention Management</h1>
               <p className="text-muted-foreground">Registrations, payments and admin activity.</p>
@@ -210,11 +229,45 @@ const AdminConvention = () => {
             </DropdownMenu>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-            {statCards.map(s => (
+          {/* Revenue summary — prominently at the top */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+            <div className="bg-accent/10 border border-accent/30 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-accent" />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Revenue Collected (Successful)</div>
+                <div className="text-3xl font-bold text-accent">NGN {stats.revenue.toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount Registered (All Statuses)</div>
+                <div className="text-3xl font-bold text-foreground">NGN {stats.totalAmount.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status breakdown */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+            {statusCards.map(s => (
+              <div key={s.label} className={`rounded-xl border p-4 ${s.className}`}>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className="text-xl font-bold mt-1">{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Type breakdown */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            {typeCards.map(s => (
               <div key={s.label} className="bg-card rounded-xl border border-border p-4">
                 <div className="text-xs text-muted-foreground">{s.label}</div>
                 <div className="text-xl font-bold mt-1">{s.value}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{s.sub}</div>
               </div>
             ))}
           </div>
@@ -389,7 +442,7 @@ const AdminConvention = () => {
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {[
+                {([
                   ["Registration ID", selected.id],
                   ["Full Name", selected.full_name],
                   ["Email", selected.email],
@@ -409,10 +462,10 @@ const AdminConvention = () => {
                   ["Accommodation", selected.accommodation_request],
                   ["Emergency Contact", selected.emergency_contact_name],
                   ["Emergency Phone", selected.emergency_contact_phone],
-                ].map(([k, v]) => (
-                  <div key={k as string}>
+                ] as [string, any][]).map(([k, v]) => (
+                  <div key={k}>
                     <div className="text-xs text-muted-foreground">{k}</div>
-                    <div className="font-medium break-words">{(v as any) || "—"}</div>
+                    <div className="font-medium break-words">{v || "—"}</div>
                   </div>
                 ))}
               </div>

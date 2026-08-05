@@ -8,7 +8,7 @@ import { query } from "../lib/db";
 
 const router = Router();
 
-// ── Helper: parse JSON value from MySQL (may already be object or string) ────
+// ── Helper: parse JSON value from MySQL/PG (may already be object or string) ─
 function parseJson(raw: unknown): Record<string, string> {
   if (!raw) return {};
   if (typeof raw === "object") return raw as Record<string, string>;
@@ -19,14 +19,10 @@ function parseJson(raw: unknown): Record<string, string> {
 // FLUTTERWAVE SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/admin/settings/flutterwave
- * Returns the stored Flutterwave keys (admin only).
- */
 router.get("/admin/settings/flutterwave", requireAdmin, async (_req, res, next) => {
   try {
     const rows = await query<{ value: unknown }[]>(
-      "SELECT `value` FROM `app_settings` WHERE `key` = 'flutterwave' LIMIT 1",
+      "SELECT value FROM app_settings WHERE key = 'flutterwave' LIMIT 1",
     );
     const value = rows[0] ? parseJson(rows[0].value) : {};
     res.json({ data: value, error: null });
@@ -35,11 +31,6 @@ router.get("/admin/settings/flutterwave", requireAdmin, async (_req, res, next) 
   }
 });
 
-/**
- * PUT /api/admin/settings/flutterwave
- * Upserts the Flutterwave keys in app_settings (admin only).
- * Body: { public_key, secret_key, encryption_key }
- */
 router.put("/admin/settings/flutterwave", requireAdmin, async (req, res, next) => {
   try {
     const { public_key = "", secret_key = "", encryption_key = "" } = req.body ?? {};
@@ -51,11 +42,11 @@ router.put("/admin/settings/flutterwave", requireAdmin, async (req, res, next) =
     const userId = req.authUser!.id;
 
     await query(
-      `INSERT INTO \`app_settings\` (\`key\`, \`value\`, \`updated_by\`)
+      `INSERT INTO app_settings (key, value, updated_by)
          VALUES ('flutterwave', ?, ?)
-       ON DUPLICATE KEY UPDATE
-         \`value\`      = VALUES(\`value\`),
-         \`updated_by\` = VALUES(\`updated_by\`)`,
+       ON CONFLICT (key) DO UPDATE SET
+         value      = EXCLUDED.value,
+         updated_by = EXCLUDED.updated_by`,
       [valueJson, userId],
     );
 
@@ -78,9 +69,13 @@ router.get("/admin/transactions", requireAdmin, async (_req, res, next) => {
     const rows = await query<unknown[]>(
       `SELECT
          id, reference_code, tx_ref, flw_transaction_id,
-         full_name, email, amount, currency,
-         payment_status, registration_type, created_at
-       FROM \`convention_registrations\`
+         full_name, email, phone, gender,
+         amount, currency, payment_status, registration_type,
+         institution, department, matric_number, graduation_year,
+         chapter_name, delegates_count,
+         accommodation_request, emergency_contact_name, emergency_contact_phone,
+         notes, created_at
+       FROM convention_registrations
        ORDER BY created_at DESC`,
     );
     res.json({ data: rows, error: null });
@@ -97,7 +92,7 @@ router.get("/admin/transactions", requireAdmin, async (_req, res, next) => {
 router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, next) => {
   try {
     const rows = await query<{ flw_transaction_id: string; tx_ref: string }[]>(
-      "SELECT flw_transaction_id, tx_ref FROM `convention_registrations` WHERE id = ? LIMIT 1",
+      "SELECT flw_transaction_id, tx_ref FROM convention_registrations WHERE id = ? LIMIT 1",
       [req.params.id],
     );
     if (!rows.length) {
@@ -120,10 +115,6 @@ router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, nex
 // BLOG POSTS (admin)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/admin/posts?limit=N
- * Lists all posts (any status) newest-first, with view counts and author name.
- */
 router.get("/admin/posts", requireAdmin, async (req, res, next) => {
   try {
     const parsedLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
@@ -144,10 +135,6 @@ router.get("/admin/posts", requireAdmin, async (req, res, next) => {
   }
 });
 
-/**
- * PATCH /api/admin/posts/:id
- * Updates post status (published/draft) and sets published_at accordingly.
- */
 router.patch("/admin/posts/:id", requireAdmin, async (req, res, next) => {
   try {
     const { status } = req.body ?? {};
@@ -166,10 +153,6 @@ router.patch("/admin/posts/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-/**
- * DELETE /api/admin/posts/:id
- * Deletes a blog post.
- */
 router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
   try {
     await query("DELETE FROM blog_posts WHERE id = ?", [req.params.id]);
@@ -205,7 +188,7 @@ router.get("/admin/users", requireAdmin, async (_req, res, next) => {
         u.id AS user_id,
         COALESCE(p.full_name, cr.full_name) AS full_name,
         COALESCE(p.email, cr.email) AS email,
-        COALESCE(p.institution, '') AS institution,
+        COALESCE(p.institution, cr.institution, '') AS institution,
         COALESCE(p.academic_level, '') AS academic_level,
         COALESCE(p.created_at, cr.created_at) AS created_at,
         COALESCE(ur.role, 'user') AS role
@@ -242,6 +225,28 @@ router.get("/admin/users", requireAdmin, async (_req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADMIN LOGIN LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/login-log
+ * Returns the last 50 admin sign-in events.
+ */
+router.get("/admin/login-log", requireAdmin, async (_req, res, next) => {
+  try {
+    const rows = await query<unknown[]>(
+      `SELECT id, email, user_id, user_agent, ip_address, created_at
+       FROM admin_login_log
+       ORDER BY created_at DESC
+       LIMIT 50`,
+    );
+    res.json({ data: rows, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD STATS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -252,21 +257,21 @@ router.get("/admin/users", requireAdmin, async (_req, res, next) => {
 router.get("/admin/stats", requireAdmin, async (_req, res, next) => {
   try {
     const [users, resources, posts, downloads, conventionRevenue] = await Promise.all([
-      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM convention_registrations"),
-      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM library_resources"),
-      query<{ cnt: number }[]>("SELECT COUNT(*) AS cnt FROM blog_posts"),
-      query<{ total: number }[]>("SELECT COALESCE(SUM(download_count), 0) AS total FROM library_resources"),
-      query<{ total: number }[]>(
+      query<{ cnt: string }[]>("SELECT COUNT(*) AS cnt FROM convention_registrations"),
+      query<{ cnt: string }[]>("SELECT COUNT(*) AS cnt FROM library_resources"),
+      query<{ cnt: string }[]>("SELECT COUNT(*) AS cnt FROM blog_posts"),
+      query<{ total: string }[]>("SELECT COALESCE(SUM(download_count), 0) AS total FROM library_resources"),
+      query<{ total: string }[]>(
         "SELECT COALESCE(SUM(CASE WHEN amount IS NOT NULL THEN amount ELSE 0 END), 0) AS total FROM convention_registrations WHERE payment_status = 'successful'"
       ),
     ]);
     res.json({
       data: {
-        users: users[0]?.cnt ?? 0,
-        resources: resources[0]?.cnt ?? 0,
-        posts: posts[0]?.cnt ?? 0,
-        downloads: downloads[0]?.total ?? 0,
-        conventionRevenue: conventionRevenue[0]?.total ?? 0,
+        users: Number(users[0]?.cnt ?? 0),
+        resources: Number(resources[0]?.cnt ?? 0),
+        posts: Number(posts[0]?.cnt ?? 0),
+        downloads: Number(downloads[0]?.total ?? 0),
+        conventionRevenue: Number(conventionRevenue[0]?.total ?? 0),
       },
       error: null,
     });

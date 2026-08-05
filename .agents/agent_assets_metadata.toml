@@ -18,5 +18,5 @@ description = "Updated build with executives page fixed. Upload to your host and
 id = "wuv3wEcQbksV3vGAxIn8S"
 uri = "file://frontend-dist.zip"
 type = "unspecified"
-title = "NUASA Frontend — Clean Production Build"
-description = "Rebuilt frontend with Replit SDK removed and institution field updated to free-text. Extract and upload the contents to your GO54 hosting root."
+title = "NUASA Frontend — frontend-dist.zip"
+description = "Production build with Replit SDK stripped. Upload to GO54. (1.5 MB)"
