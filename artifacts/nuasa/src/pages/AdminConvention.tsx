@@ -2,7 +2,7 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Loader2, Search, Download, Eye, ShieldCheck, RefreshCw, DollarSign,
+  Loader2, Search, Download, Eye, ShieldCheck, RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -190,19 +190,20 @@ const AdminConvention = () => {
 
   const handleLogout = async () => { await signOut(); navigate("/admin/login"); };
 
-  const statusCards = [
-    { label: "Total Registrations", value: stats.total, className: "bg-card" },
-    { label: "Successful", value: stats.successful, className: "bg-green-50 border-green-200 text-green-800" },
-    { label: "Pending", value: stats.pending, className: "bg-yellow-50 border-yellow-200 text-yellow-800" },
-    { label: "Failed", value: stats.failed, className: "bg-red-50 border-red-200 text-red-800" },
-    { label: "Today", value: stats.today, className: "bg-card" },
-    { label: "This Month", value: stats.month, className: "bg-card" },
+  const row1Cards = [
+    { label: "Total Registrations", value: stats.total, highlight: true },
+    { label: "Successful", value: stats.successful, highlight: false },
+    { label: "Pending", value: stats.pending, highlight: false },
+    { label: "Failed", value: stats.failed, highlight: false },
+    { label: "Today", value: stats.today, highlight: false },
   ];
 
-  const typeCards = [
-    { label: "Students", value: `${stats.students}`, sub: `NGN ${stats.studentsRev.toLocaleString()}` },
-    { label: "Graduates", value: `${stats.graduates}`, sub: `NGN ${stats.graduatesRev.toLocaleString()}` },
-    { label: "Chapters", value: `${stats.chapters}`, sub: `NGN ${stats.chaptersRev.toLocaleString()}` },
+  const row2Cards = [
+    { label: "This Month", value: String(stats.month) },
+    { label: "Students (count / NGN)", value: `${stats.students} / ${stats.studentsRev.toLocaleString()}` },
+    { label: "Graduates (count / NGN)", value: `${stats.graduates} / ${stats.graduatesRev.toLocaleString()}` },
+    { label: "Chapters (count / NGN)", value: `${stats.chapters} / ${stats.chaptersRev.toLocaleString()}` },
+    { label: "Total Revenue (NGN)", value: stats.revenue.toLocaleString() },
   ];
 
   return (
@@ -229,45 +230,24 @@ const AdminConvention = () => {
             </DropdownMenu>
           </div>
 
-          {/* Revenue summary — prominently at the top */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-            <div className="bg-accent/10 border border-accent/30 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Revenue Collected (Successful)</div>
-                <div className="text-3xl font-bold text-accent">NGN {stats.revenue.toLocaleString()}</div>
-              </div>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount Registered (All Statuses)</div>
-                <div className="text-3xl font-bold text-foreground">NGN {stats.totalAmount.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Status breakdown */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-            {statusCards.map(s => (
-              <div key={s.label} className={`rounded-xl border p-4 ${s.className}`}>
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-                <div className="text-xl font-bold mt-1">{s.value}</div>
+          {/* Row 1 — status counts */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+            {row1Cards.map(s => (
+              <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className={`text-xs font-medium mb-1 ${s.highlight ? "text-blue-600 bg-blue-50 inline-block px-1.5 py-0.5 rounded" : "text-gray-500"}`}>
+                  {s.label}
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{s.value}</div>
               </div>
             ))}
           </div>
 
-          {/* Type breakdown */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {typeCards.map(s => (
-              <div key={s.label} className="bg-card rounded-xl border border-border p-4">
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-                <div className="text-xl font-bold mt-1">{s.value}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{s.sub}</div>
+          {/* Row 2 — period + type + revenue */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+            {row2Cards.map(s => (
+              <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className="text-xs text-gray-500 font-medium mb-1">{s.label}</div>
+                <div className="text-2xl font-bold text-gray-900">{s.value}</div>
               </div>
             ))}
           </div>

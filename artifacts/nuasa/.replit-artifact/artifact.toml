@@ -12,7 +12,7 @@ paths = [ "/" ]
 localPort = 21844
 
 [services.development]
-run = "pnpm --filter @workspace/nuasa run dev"
+run = "npm --prefix /home/runner/workspace/artifacts/nuasa run build && PORT=21844 BASE_PATH=/ npm --prefix /home/runner/workspace/artifacts/nuasa run serve"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/nuasa", "run", "build" ]
