@@ -247,6 +247,84 @@ router.get("/admin/login-log", requireAdmin, async (_req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONVENTION STATS  (DB-computed — drives the top cards on the admin page)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/convention-stats
+ * All arithmetic done in SQL so the frontend just renders numbers.
+ */
+router.get("/admin/convention-stats", requireAdmin, async (_req, res, next) => {
+  try {
+    const [overview, byType] = await Promise.all([
+      query<{
+        total: string; successful: string; pending: string; failed: string;
+        today: string; this_month: string; total_amount: string;
+      }[]>(`
+        SELECT
+          COUNT(*)::int                                                             AS total,
+          COUNT(*) FILTER (WHERE payment_status = 'successful')::int              AS successful,
+          COUNT(*) FILTER (WHERE payment_status = 'pending')::int                 AS pending,
+          COUNT(*) FILTER (WHERE payment_status = 'failed')::int                  AS failed,
+          COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int            AS today,
+          COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', NOW()))::int   AS this_month,
+          COALESCE(SUM(amount), 0)                                                 AS total_amount
+        FROM convention_registrations
+      `),
+      query<{
+        registration_type: string;
+        ok_count: string; unit_price: string; ok_revenue: string;
+      }[]>(`
+        SELECT
+          registration_type,
+          COUNT(*) FILTER (WHERE payment_status = 'successful')::int              AS ok_count,
+          COALESCE(SUM(amount) FILTER (WHERE payment_status = 'successful'), 0)   AS ok_revenue,
+          CASE
+            WHEN COUNT(*) FILTER (WHERE payment_status = 'successful') > 0
+            THEN ROUND(
+              SUM(amount) FILTER (WHERE payment_status = 'successful') /
+              COUNT(*) FILTER (WHERE payment_status = 'successful')
+            )
+            ELSE 0
+          END                                                                       AS unit_price
+        FROM convention_registrations
+        WHERE registration_type IN ('student', 'graduate', 'chapter')
+        GROUP BY registration_type
+      `),
+    ]);
+
+    const o = overview[0] ?? {};
+    const def = { ok_count: 0, unit_price: 0, ok_revenue: 0 };
+    const typeMap: Record<string, typeof def> = {};
+    for (const r of byType) {
+      typeMap[r.registration_type] = {
+        ok_count:   Number(r.ok_count),
+        unit_price: Number(r.unit_price),
+        ok_revenue: Number(r.ok_revenue),
+      };
+    }
+
+    res.json({
+      data: {
+        total:       Number(o.total       ?? 0),
+        successful:  Number(o.successful  ?? 0),
+        pending:     Number(o.pending     ?? 0),
+        failed:      Number(o.failed      ?? 0),
+        today:       Number(o.today       ?? 0),
+        this_month:  Number(o.this_month  ?? 0),
+        total_amount: Number(o.total_amount ?? 0),
+        students:  typeMap["student"]  ?? def,
+        graduates: typeMap["graduate"] ?? def,
+        chapters:  typeMap["chapter"]  ?? def,
+      },
+      error: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD STATS
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -67,6 +67,24 @@ const AdminConvention = () => {
     },
   });
 
+  // All stats computed by the DB — no client-side arithmetic
+  const { data: dbStats } = useQuery({
+    queryKey: ["admin-convention-stats"],
+    queryFn: async () => {
+      const result = await apiFetch<{
+        data: {
+          total: number; successful: number; pending: number; failed: number;
+          today: number; this_month: number; total_amount: number;
+          students:  { ok_count: number; unit_price: number; ok_revenue: number };
+          graduates: { ok_count: number; unit_price: number; ok_revenue: number };
+          chapters:  { ok_count: number; unit_price: number; ok_revenue: number };
+        };
+        error: null;
+      }>("/admin/convention-stats");
+      return result.data;
+    },
+  });
+
   const { data: loginLog } = useQuery({
     queryKey: ["admin-login-log"],
     queryFn: async () => {
@@ -74,44 +92,6 @@ const AdminConvention = () => {
       return result.data;
     },
   });
-
-  const stats = useMemo(() => {
-    const all = data || [];
-    const ok = all.filter(r => r.payment_status === "successful");
-    const totalAmount = all.reduce((s, r) => s + Number(r.amount || 0), 0);
-
-    // per-type: successful count, revenue, and derived per-unit fee
-    const okStudents  = ok.filter(r => r.registration_type === "student");
-    const okGraduates = ok.filter(r => r.registration_type === "graduate");
-    const okChapters  = ok.filter(r => r.registration_type === "chapter");
-
-    const studentsOk  = okStudents.length;
-    const studentsRev = okStudents.reduce((s, r) => s + Number(r.amount), 0);
-    const studentsUnit = studentsOk > 0 ? Math.round(studentsRev / studentsOk) : 0;
-
-    const graduatesOk  = okGraduates.length;
-    const graduatesRev = okGraduates.reduce((s, r) => s + Number(r.amount), 0);
-    const graduatesUnit = graduatesOk > 0 ? Math.round(graduatesRev / graduatesOk) : 0;
-
-    const chaptersOk  = okChapters.length;
-    const chaptersRev = okChapters.reduce((s, r) => s + Number(r.amount), 0);
-    const chaptersUnit = chaptersOk > 0 ? Math.round(chaptersRev / chaptersOk) : 0;
-
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    return {
-      total: all.length,
-      successful: ok.length,
-      pending: all.filter(r => r.payment_status === "pending").length,
-      failed: all.filter(r => r.payment_status === "failed").length,
-      totalAmount,
-      studentsOk, studentsRev, studentsUnit,
-      graduatesOk, graduatesRev, graduatesUnit,
-      chaptersOk, chaptersRev, chaptersUnit,
-      today: all.filter(r => new Date(r.created_at) >= today).length,
-      month: all.filter(r => new Date(r.created_at) >= startMonth).length,
-    };
-  }, [data]);
 
   const filtered = useMemo(() => {
     let rows = data || [];
@@ -201,32 +181,35 @@ const AdminConvention = () => {
 
   const handleLogout = async () => { await signOut(); navigate("/admin/login"); };
 
+  const s = dbStats;
+  const fmt = (n: number) => n.toLocaleString();
+
   const row1Cards = [
-    { label: "Total Registrations", value: stats.total, highlight: true },
-    { label: "Successful", value: stats.successful, highlight: false },
-    { label: "Pending", value: stats.pending, highlight: false },
-    { label: "Failed", value: stats.failed, highlight: false },
-    { label: "Today", value: stats.today, highlight: false },
+    { label: "Total Registrations", value: s?.total ?? "—", highlight: true },
+    { label: "Successful",          value: s?.successful ?? "—", highlight: false },
+    { label: "Pending",             value: s?.pending ?? "—",    highlight: false },
+    { label: "Failed",              value: s?.failed ?? "—",     highlight: false },
+    { label: "Today",               value: s?.today ?? "—",      highlight: false },
   ];
 
   const row2Cards = [
-    { label: "This Month", calc: null, total: String(stats.month) },
+    { label: "This Month",        calc: null, total: s ? String(s.this_month) : "—" },
     {
       label: "Students",
-      calc: `${stats.studentsOk} successful × NGN ${stats.studentsUnit.toLocaleString()}`,
-      total: `NGN ${stats.studentsRev.toLocaleString()}`,
+      calc:  s ? `${s.students.ok_count} successful × NGN ${fmt(s.students.unit_price)}`  : null,
+      total: s ? `NGN ${fmt(s.students.ok_revenue)}`  : "—",
     },
     {
       label: "Graduates",
-      calc: `${stats.graduatesOk} successful × NGN ${stats.graduatesUnit.toLocaleString()}`,
-      total: `NGN ${stats.graduatesRev.toLocaleString()}`,
+      calc:  s ? `${s.graduates.ok_count} successful × NGN ${fmt(s.graduates.unit_price)}` : null,
+      total: s ? `NGN ${fmt(s.graduates.ok_revenue)}` : "—",
     },
     {
       label: "Chapters",
-      calc: `${stats.chaptersOk} successful × NGN ${stats.chaptersUnit.toLocaleString()}`,
-      total: `NGN ${stats.chaptersRev.toLocaleString()}`,
+      calc:  s ? `${s.chapters.ok_count} successful × NGN ${fmt(s.chapters.unit_price)}`  : null,
+      total: s ? `NGN ${fmt(s.chapters.ok_revenue)}`  : "—",
     },
-    { label: "Total Revenue (NGN)", calc: null, total: stats.totalAmount.toLocaleString() },
+    { label: "Total Revenue (NGN)", calc: null, total: s ? fmt(s.total_amount) : "—" },
   ];
 
   return (
