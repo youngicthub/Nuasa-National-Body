@@ -232,6 +232,15 @@ router.post("/data/:table", async (req, res, next) => {
         return;
       }
     }
+    // Server-side canonical prices for convention registrations.
+    // These are the source of truth — the frontend amount is always overridden
+    // so neither bugs nor tampering can produce wrong revenue figures.
+    const CONVENTION_PRICES: Record<string, number> = {
+      student:  15000,
+      graduate: 30000,
+      chapter:  50000,
+    };
+
     const inserted: any[] = [];
     for (const input of records) {
       const row: Record<string, unknown> = {
@@ -245,6 +254,16 @@ router.post("/data/:table", async (req, res, next) => {
         row.password_hash = await bcrypt.hash(row.password, 12);
       }
       delete row.password;
+
+      // Enforce canonical price regardless of what the frontend sent.
+      if (table === "convention_registrations") {
+        const regType = String(row.registration_type || "").toLowerCase();
+        const canonicalPrice = CONVENTION_PRICES[regType];
+        if (canonicalPrice) {
+          row.amount = canonicalPrice;
+          row.payment_amount = canonicalPrice;
+        }
+      }
       const keys = Object.keys(row).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key));
       const values = keys.map((key) => row[key] === undefined ? null : row[key]);
       const updateKeys = keys.filter((key) => key !== "id" && key !== "key");
