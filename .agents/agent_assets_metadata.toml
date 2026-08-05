@@ -48,3 +48,10 @@ uri = "file://nuasa-frontend-live-upload.zip"
 type = "unspecified"
 title = "NUASA frontend live upload ZIP"
 description = "Clean static frontend package for upload to your live host. Extract the ZIP contents directly into the hosting document root; config.js is already set to the live Replit API URL."
+
+[[outputs]]
+id = "FTUFBRYA48P7R7xfA5Um8"
+uri = "file://nuasa-frontend-afeeshost.zip"
+type = "unspecified"
+title = "NUASA Frontend — AfeeHost Deploy Package"
+description = "Production-built static frontend. Extract to your web root on AfeeHost. The included config.js already points to the live Replit API at https://nuasa-national-body--dopedylan656.replit.app/api"
