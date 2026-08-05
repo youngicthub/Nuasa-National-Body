@@ -180,6 +180,68 @@ router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ALL USERS (profiles + convention registrants without profiles)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/users
+ * Returns every user: profile-backed accounts UNION convention registrants
+ * who registered before auto-account creation was in place.
+ */
+router.get("/admin/users", requireAdmin, async (_req, res, next) => {
+  try {
+    const rows = await query<{
+      id: string;
+      user_id: string | null;
+      full_name: string;
+      email: string;
+      institution: string;
+      academic_level: string;
+      created_at: string;
+      role: string;
+    }[]>(`
+      SELECT
+        COALESCE(u.id, cr.id::text) AS id,
+        u.id AS user_id,
+        COALESCE(p.full_name, cr.full_name) AS full_name,
+        COALESCE(p.email, cr.email) AS email,
+        COALESCE(p.institution, '') AS institution,
+        COALESCE(p.academic_level, '') AS academic_level,
+        COALESCE(p.created_at, cr.created_at) AS created_at,
+        COALESCE(ur.role, 'user') AS role
+      FROM convention_registrations cr
+      LEFT JOIN users u ON LOWER(u.email) = LOWER(cr.email)
+      LEFT JOIN profiles p ON p.user_id = u.id
+      LEFT JOIN user_roles ur ON ur.user_id = u.id
+
+      UNION
+
+      SELECT
+        u.id AS id,
+        p.user_id AS user_id,
+        p.full_name,
+        p.email,
+        COALESCE(p.institution, '') AS institution,
+        COALESCE(p.academic_level, '') AS academic_level,
+        p.created_at,
+        COALESCE(ur.role, 'user') AS role
+      FROM profiles p
+      JOIN users u ON u.id = p.user_id
+      LEFT JOIN user_roles ur ON ur.user_id = p.user_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM convention_registrations cr2
+        WHERE LOWER(cr2.email) = LOWER(p.email)
+      )
+
+      ORDER BY created_at DESC
+    `);
+    res.json({ data: rows, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD STATS
 // ─────────────────────────────────────────────────────────────────────────────
 

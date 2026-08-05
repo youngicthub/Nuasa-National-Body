@@ -12,7 +12,7 @@ id = "Lot82zeTf9fVUW37EYQbF"
 uri = "file://nuasa-frontend-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — Updated Build"
-description = "Updated production build with corrected dashboard stats. Upload to your host and set window.__NUASA_API_URL__ in config.js."
+description = "Updated production build with the Users page now showing all convention registrants. Upload to your host and set window.__NUASA_API_URL__ in config.js."
 
 [[outputs]]
 id = "wuv3wEcQbksV3vGAxIn8S"

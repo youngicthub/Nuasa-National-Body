@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -29,17 +30,20 @@ const AdminUsers = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users-list"],
     queryFn: async () => {
-      const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, user_id, full_name, email, institution, academic_level, avatar_url, created_at")
-          .order("created_at", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role"),
-      ]);
-      if (pErr) throw pErr;
-      if (rErr) throw rErr;
-      const roleMap = new Map((roles || []).map((r) => [r.user_id, r.role]));
-      return (profiles || []).map((p) => ({ ...p, role: roleMap.get(p.user_id) || "user" }));
+      const result = await apiFetch<{
+        data: {
+          id: string;
+          user_id: string | null;
+          full_name: string;
+          email: string;
+          institution: string;
+          academic_level: string;
+          created_at: string;
+          role: string;
+        }[];
+        error: null;
+      }>("/admin/users");
+      return result.data;
     },
   });
 
@@ -138,7 +142,7 @@ const AdminUsers = () => {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-          {u.user_id !== currentUser?.id && showAdminActions && (
+          {u.user_id && u.user_id !== currentUser?.id && showAdminActions && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -175,7 +179,7 @@ const AdminUsers = () => {
             </AlertDialog>
           )}
 
-          {u.user_id !== currentUser?.id && !showAdminActions && (
+          {u.user_id && u.user_id !== currentUser?.id && !showAdminActions && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -212,7 +216,7 @@ const AdminUsers = () => {
             </AlertDialog>
           )}
 
-          {u.user_id !== currentUser?.id && (
+          {u.user_id && u.user_id !== currentUser?.id && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
