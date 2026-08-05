@@ -41,3 +41,10 @@ uri = "file://nuasa-afeeshost-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — AfeesHost Upload Package"
 description = "The Replit API URL is now baked directly into the JS bundle — no config.js dependency. Unzip and upload all contents to your AfeesHost public root."
+
+[[outputs]]
+id = "UI0dzi2LavTx4mT0CO4Jc"
+uri = "file://nuasa-frontend-live-upload.zip"
+type = "unspecified"
+title = "NUASA frontend live upload ZIP"
+description = "Clean static frontend package for upload to your live host. Extract the ZIP contents directly into the hosting document root; config.js is already set to the live Replit API URL."
