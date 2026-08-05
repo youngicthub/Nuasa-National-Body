@@ -82,12 +82,40 @@ const setupMessage = (message: string) => {
   return message;
 };
 
+/** Resize + compress an image File to a JPEG data URL (max 500×600px, 80% quality). */
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => {
+        const MAX_W = 500, MAX_H = 600;
+        let { width, height } = img;
+        if (width > MAX_W || height > MAX_H) {
+          const ratio = Math.min(MAX_W / width, MAX_H / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = ev.target!.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const AdminExecutives = () => {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Executive | null>(null);
   const [form, setForm] = useState<Omit<Executive, "id">>(blank);
-  const [file, setFile] = useState<File | null>(null);
+  const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // DB uses: name, display_order, is_current — app UI uses: full_name, sort_order, is_active
@@ -130,7 +158,7 @@ const AdminExecutives = () => {
   const openNew = () => {
     setEditing(null);
     setForm(blank);
-    setFile(null);
+    setFileDataUrl(null);
     setOpen(true);
   };
 
@@ -146,7 +174,7 @@ const AdminExecutives = () => {
       sort_order: e.sort_order,
       is_active: e.is_active,
     });
-    setFile(null);
+    setFileDataUrl(null);
     setOpen(true);
   };
 
@@ -158,18 +186,8 @@ const AdminExecutives = () => {
     }
     setSaving(true);
     try {
-      let image_url = parsed.data.image_url;
-      if (file) {
-        const ext = file.name.split(".").pop() || "jpg";
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("executives").upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-        if (upErr) throw upErr;
-        const { data: pub } = supabase.storage.from("executives").getPublicUrl(path);
-        image_url = pub.publicUrl;
-      }
+      // Use the compressed data URL if admin picked a new photo, otherwise keep existing URL
+      const image_url = fileDataUrl ?? parsed.data.image_url;
 
       const dbPayload = toDb({ ...parsed.data, image_url });
 
@@ -276,9 +294,27 @@ const AdminExecutives = () => {
                 </div>
                 <div>
                   <Label>Photo</Label>
-                  <Input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-                  {form.image_url && !file && (
-                    <img src={form.image_url} alt="" className="mt-2 w-24 h-24 object-cover rounded" />
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) { setFileDataUrl(null); return; }
+                      try {
+                        const dataUrl = await compressImage(f);
+                        setFileDataUrl(dataUrl);
+                      } catch {
+                        toast.error("Could not process image. Try a different file.");
+                        setFileDataUrl(null);
+                      }
+                    }}
+                  />
+                  {(fileDataUrl || form.image_url) && (
+                    <img
+                      src={fileDataUrl || form.image_url || ""}
+                      alt="Preview"
+                      className="mt-2 w-24 h-24 object-cover rounded border"
+                    />
                   )}
                 </div>
                 <div>
