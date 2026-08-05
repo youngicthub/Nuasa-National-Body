@@ -70,7 +70,7 @@ const AdminConvention = () => {
   const { data: loginLog } = useQuery({
     queryKey: ["admin-login-log"],
     queryFn: async () => {
-      const result = await apiFetch<{ data: { id: string; email: string; user_id: string; user_agent: string; created_at: string }[]; error: null }>("/admin/login-log");
+      const result = await apiFetch<{ data: { id: string; user_id: string; user_agent: string; ip_address: string; created_at: string }[]; error: null }>("/admin/login-log");
       return result.data;
     },
   });
@@ -412,7 +412,7 @@ const AdminConvention = () => {
                       {loginLog.map((l) => (
                         <TableRow key={l.id}>
                           <TableCell className="text-xs">{format(new Date(l.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                          <TableCell className="text-xs">{l.email || l.user_id}</TableCell>
+                          <TableCell className="text-xs">{l.user_id || "—"}</TableCell>
                           <TableCell className="text-xs text-muted-foreground truncate max-w-md">{l.user_agent}</TableCell>
                         </TableRow>
                       ))}

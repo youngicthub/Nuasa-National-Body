@@ -70,7 +70,7 @@ router.get("/admin/transactions", requireAdmin, async (_req, res, next) => {
       `SELECT
          id, reference_code, tx_ref, flw_transaction_id,
          full_name, email, phone, gender,
-         amount, currency, payment_status, registration_type,
+         amount, payment_status, registration_type,
          institution, department, matric_number, graduation_year,
          chapter_name, delegates_count,
          accommodation_request, emergency_contact_name, emergency_contact_phone,
@@ -235,7 +235,7 @@ router.get("/admin/users", requireAdmin, async (_req, res, next) => {
 router.get("/admin/login-log", requireAdmin, async (_req, res, next) => {
   try {
     const rows = await query<unknown[]>(
-      `SELECT id, email, user_id, user_agent, ip_address, created_at
+      `SELECT id, user_id, user_agent, ip_address, created_at
        FROM admin_login_log
        ORDER BY created_at DESC
        LIMIT 50`,
