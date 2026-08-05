@@ -3,4 +3,5 @@
 - [MySQL 8.0 undo tablespace fix (Nix)](mysql-undo-restart-fix.md) — Always delete undo_* from datadir before every mysqld start; 8.0.42 on Nix recreates them on every boot and crashes if they exist.
 - [Lovable migration CSS fix](lovable-css-fix.md) — Lovable apps use @import before @tailwind; copy script doesn't fix this.
 - [Artifact workflows](artifact-workflows.md) — Use artifact-managed service workflows as canonical; remove duplicate legacy workflows after artifact registration.
+- [NUASA API URL config](nuasa-api-url-config.md) — config.js/VITE_API_URL must be unset in dev or CORS breaks; only set the production URL in the afeeshost-deployed config.js.
 - [Imported workflow naming](imported-workflow-naming.md) — Imported artifact metadata may exist without runtime registration; verify actual workflow names before restarting.

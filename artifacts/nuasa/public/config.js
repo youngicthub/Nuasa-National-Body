@@ -1,12 +1,11 @@
 /**
  * NUASA runtime configuration
- * This file is loaded BEFORE the React bundle, so window.__NUASA_API_URL__ overrides
- * the build-time VITE_API_URL value in all API calls.
  *
- * On GO54 / afeeshost (static hosting): the API is hosted on Replit at the URL below.
- * Leave this value as-is — it points to the live Replit backend.
+ * This file is loaded BEFORE the React bundle and overrides the API base URL.
+ * In development (Replit), leave window.__NUASA_API_URL__ unset so the
+ * Vite dev-server proxy handles /api → localhost:8080 automatically.
  *
- * To point at a different backend (e.g. local dev), change the URL here:
- *   window.__NUASA_API_URL__ = "http://localhost:8080/api";
+ * On afeeshost / GO54 (static hosting), set this to the live Replit backend:
+ *   window.__NUASA_API_URL__ = "https://nuasa-national-body--everyoungdan200.replit.app/api";
  */
-window.__NUASA_API_URL__ = "https://nuasa-national-body--everyoungdan200.replit.app/api";
+// window.__NUASA_API_URL__ = "https://nuasa-national-body--everyoungdan200.replit.app/api";
