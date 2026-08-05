@@ -15,6 +15,12 @@ const listeners = new Set<(event: string, session: Session | null) => void>();
 
 export type ApiError = Error & { code?: string; status?: number };
 
+function authResponseError(message: string, status?: number): ApiError {
+  const error = new Error(message) as ApiError;
+  error.status = status;
+  return error;
+}
+
 async function request(path: string, init?: RequestInit) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = new Headers(init?.headers);
@@ -116,7 +122,11 @@ function tableQuery(table: string) {
 export const supabase = {
   from: (table: string) => tableQuery(table),
   auth: {
-    async signUp({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } }) {
+    async signUp({ email, password, options }: {
+      email: string;
+      password: string;
+      options?: { data?: Record<string, unknown>; emailRedirectTo?: string };
+    }) {
       try {
         const payload = await request("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, metadata: options?.data }) });
         if (payload.session?.access_token) {
@@ -129,15 +139,35 @@ export const supabase = {
     async signInWithPassword({ email, password }: { email: string; password: string }) {
       try {
         const payload = await request("/auth/signin", { method: "POST", body: JSON.stringify({ email, password }) });
-        localStorage.setItem(TOKEN_KEY, payload.session.access_token);
-        emit("SIGNED_IN", payload.session);
-        return { data: payload, error: null };
+        const accessToken = payload?.session?.access_token;
+        const signedInUser = payload?.session?.user ?? payload?.user;
+
+        // Never dereference a partial response. This can happen when a static
+        // frontend is pointed at the wrong API URL or an API deployment
+        // returns a non-auth payload with a 2xx status.
+        if (typeof accessToken !== "string" || !accessToken || !signedInUser) {
+          return {
+            data: { user: null, session: null },
+            error: authResponseError(
+              "The login service returned an incomplete session. Please check the API URL and try again.",
+            ),
+          };
+        }
+
+        const session: Session = { access_token: accessToken, user: signedInUser };
+        localStorage.setItem(TOKEN_KEY, accessToken);
+        emit("SIGNED_IN", session);
+        return { data: { ...payload, session }, error: null };
       } catch (error) { return { data: { user: null, session: null }, error: error as Error }; }
     },
     async getSession() {
       try {
         const payload = await request("/auth/session");
-        return { data: { session: payload.session as Session | null }, error: null };
+        const session = payload?.session;
+        if (!session || typeof session.access_token !== "string" || !session.user) {
+          return { data: { session: null }, error: null };
+        }
+        return { data: { session: session as Session }, error: null };
       } catch { return { data: { session: null }, error: null }; }
     },
     async getUser() {
@@ -159,7 +189,7 @@ export const supabase = {
         return { error: null };
       } catch (error) { return { error: error as Error }; }
     },
-    async resetPasswordForEmail(email: string) {
+    async resetPasswordForEmail(email: string, _options?: { redirectTo?: string }) {
       try {
         await request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email }) });
         return { error: null };

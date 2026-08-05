@@ -11,10 +11,14 @@ declare global {
 }
 
 export function getApiBase(): string {
-  if (typeof window !== "undefined" && window.__NUASA_API_URL__) {
-    return window.__NUASA_API_URL__;
-  }
-  return import.meta.env.VITE_API_URL || "/api";
+  const configured =
+    (typeof window !== "undefined" && window.__NUASA_API_URL__) ||
+    import.meta.env.VITE_API_URL ||
+    "/api";
+
+  // Keep concatenated endpoint paths predictable when the runtime config is
+  // edited for a separately hosted static frontend.
+  return configured.replace(/\/+$/, "");
 }
 
 const TOKEN_KEY = "nuasa_local_access_token";
