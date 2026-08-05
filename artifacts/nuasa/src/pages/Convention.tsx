@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
-const PRICES = { student: 20000, graduate: 30000, chapter: 50000 } as const;
+const PRICES = { student: 15000, graduate: 30000, chapter: 50000 } as const;
 const LABELS = { student: "Student", graduate: "Graduates", chapter: "Chapter" } as const;
 
 const BREAKOUT_SESSIONS = [
@@ -29,10 +29,6 @@ const BREAKOUT_SESSIONS = [
   "Data Analytics, Technology & Digital Finance",
 ] as const;
 
-// Student discount window — active through end of July 2026
-const STUDENT_DISCOUNT_PRICE = 15000;
-const DISCOUNT_START = new Date("2026-06-16T00:00:00Z");
-const DISCOUNT_END = new Date("2026-07-31T23:59:59Z");
 
 type DelegateDetails = { name: string; phone: string; email: string };
 type DelegateField = keyof DelegateDetails;
@@ -105,14 +101,6 @@ const delegatesSchema = z.array(delegateSchema).length(2).superRefine((delegates
   }
 });
 
-function getCountdown(target: Date, now: Date) {
-  const diff = Math.max(0, target.getTime() - now.getTime());
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  const minutes = Math.floor((diff % 3600000) / 60000);
-  const seconds = Math.floor((diff % 60000) / 1000);
-  return { days, hours, minutes, seconds, done: diff === 0 };
-}
 
 declare global { interface Window { FlutterwaveCheckout?: any } }
 
@@ -188,11 +176,8 @@ const Convention = () => {
     },
   });
 
-  const discountActive = type === "student" && now >= DISCOUNT_START && now <= DISCOUNT_END;
   const basePrice = PRICES[type];
-  const amount = discountActive ? STUDENT_DISCOUNT_PRICE : basePrice;
-  const discountUpcoming = type === "student" && now < DISCOUNT_START;
-  const countdown = getCountdown(DISCOUNT_START, now);
+  const amount = basePrice;
 
   const updateDelegate = (idx: number, field: DelegateField, value: string) => {
     const formattedValue =
@@ -575,41 +560,6 @@ const Convention = () => {
                 </RadioGroup>
               </div>
 
-              {type === "student" && (
-                <div className="rounded-xl border border-accent/40 bg-accent/5 p-4">
-                  {discountActive ? (
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <div className="font-semibold text-accent">Student Discount Active — ₦15,000</div>
-                        <div className="text-xs text-muted-foreground">Ends {DISCOUNT_END.toUTCString()}</div>
-                      </div>
-                      <Badge className="bg-accent text-accent-foreground">SAVE ₦5,000</Badge>
-                    </div>
-                  ) : discountUpcoming ? (
-                    <div>
-                      <div className="font-semibold mb-2">Student Discount starts in</div>
-                      <div className="grid grid-cols-4 gap-2 text-center">
-                        {[
-                          { label: "Days", value: countdown.days },
-                          { label: "Hours", value: countdown.hours },
-                          { label: "Min", value: countdown.minutes },
-                          { label: "Sec", value: countdown.seconds },
-                        ].map((b) => (
-                          <div key={b.label} className="bg-background rounded-lg py-2 border">
-                            <div className="text-2xl font-bold tabular-nums">{String(b.value).padStart(2, "0")}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{b.label}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Student registration at ₦15,000 (was ₦20,000) until 31 July 2026.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">Student discount has ended. Standard pricing applies.</div>
-                  )}
-                </div>
-              )}
 
               {type === "student" && (
                 <div>
@@ -746,14 +696,8 @@ const Convention = () => {
               <div><Label>Convention Expectations and Allergies (optional)</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Any dietary requirements, allergies, accessibility needs, or expectations for the convention…" /></div>
 
               <div className="flex items-center justify-between bg-muted rounded-lg p-4">
-                <div className="text-sm text-muted-foreground">
-                  Total payable
-                  {discountActive && <div className="text-xs text-accent">Student discount applied — ₦15,000</div>}
-                </div>
+                <div className="text-sm text-muted-foreground">Total payable</div>
                 <div className="text-right">
-                  {discountActive && (
-                    <div className="text-sm text-muted-foreground line-through">₦{basePrice.toLocaleString()}</div>
-                  )}
                   <div className="text-2xl font-bold">₦{amount.toLocaleString()}</div>
                 </div>
               </div>
