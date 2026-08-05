@@ -80,8 +80,10 @@ const AdminConvention = () => {
     const ok = all.filter(r => r.payment_status === "successful");
     const revenue = ok.reduce((s, r) => s + Number(r.amount), 0);
     const totalAmount = all.reduce((s, r) => s + Number(r.amount || 0), 0);
-    const sumBy = (t: string) =>
-      ok.filter(r => r.registration_type === t).reduce((s, r) => s + Number(r.amount), 0);
+    // count and amount for ALL registrations of each type (any payment status)
+    const countBy = (t: string) => all.filter(r => r.registration_type === t).length;
+    const amtBy = (t: string) =>
+      all.filter(r => r.registration_type === t).reduce((s, r) => s + Number(r.amount || 0), 0);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     return {
@@ -91,12 +93,12 @@ const AdminConvention = () => {
       failed: all.filter(r => r.payment_status === "failed").length,
       revenue,
       totalAmount,
-      students: ok.filter(r => r.registration_type === "student").length,
-      studentsRev: sumBy("student"),
-      graduates: ok.filter(r => r.registration_type === "graduate").length,
-      graduatesRev: sumBy("graduate"),
-      chapters: ok.filter(r => r.registration_type === "chapter").length,
-      chaptersRev: sumBy("chapter"),
+      students: countBy("student"),
+      studentsRev: amtBy("student"),
+      graduates: countBy("graduate"),
+      graduatesRev: amtBy("graduate"),
+      chapters: countBy("chapter"),
+      chaptersRev: amtBy("chapter"),
       today: all.filter(r => new Date(r.created_at) >= today).length,
       month: all.filter(r => new Date(r.created_at) >= startMonth).length,
     };
@@ -203,7 +205,7 @@ const AdminConvention = () => {
     { label: "Students (count / NGN)", value: `${stats.students} / ${stats.studentsRev.toLocaleString()}` },
     { label: "Graduates (count / NGN)", value: `${stats.graduates} / ${stats.graduatesRev.toLocaleString()}` },
     { label: "Chapters (count / NGN)", value: `${stats.chapters} / ${stats.chaptersRev.toLocaleString()}` },
-    { label: "Total Revenue (NGN)", value: stats.revenue.toLocaleString() },
+    { label: "Total Revenue (NGN)", value: stats.totalAmount.toLocaleString() },
   ];
 
   return (

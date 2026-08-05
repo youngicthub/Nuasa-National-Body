@@ -20,3 +20,10 @@ uri = "file://frontend-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — frontend-dist.zip"
 description = "Production build with Replit SDK stripped. Upload to GO54. (1.5 MB)"
+
+[[outputs]]
+id = "l5C3zHwSuAOatWEFcGcUF"
+uri = "file://nuasa-dist.zip"
+type = "unspecified"
+title = "NUASA Frontend (dist)"
+description = "Production build of the NUASA frontend — ready to deploy on any static host."
