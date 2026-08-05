@@ -27,3 +27,10 @@ uri = "file://nuasa-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend (dist)"
 description = "Production build — convention stats now computed entirely from the database."
+
+[[outputs]]
+id = "UWOSfK6JjvvE6ncvqIvDK"
+uri = "file://nuasa-go54-dist.zip"
+type = "unspecified"
+title = "NUASA Frontend — GO54 Upload Package"
+description = "Unzip and upload all contents to your GO54 public root. The config.js inside is pre-configured to call the Replit API at https://nuasa-national-body--marlemqas123.replit.app/api"
