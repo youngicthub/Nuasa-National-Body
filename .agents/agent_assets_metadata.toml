@@ -25,8 +25,8 @@ description = "Production build with Replit SDK stripped. Upload to GO54. (1.5 M
 id = "l5C3zHwSuAOatWEFcGcUF"
 uri = "file://nuasa-dist.zip"
 type = "unspecified"
-title = "NUASA Frontend (dist)"
-description = "Production build — convention stats now computed entirely from the database."
+title = "NUASA Frontend — dist.zip"
+description = "Production-built frontend. Upload the contents of dist/public/ to afeeshost. config.js inside is pre-configured to point to the Replit API."
 
 [[outputs]]
 id = "UWOSfK6JjvvE6ncvqIvDK"
