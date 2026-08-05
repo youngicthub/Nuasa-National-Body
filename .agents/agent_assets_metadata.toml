@@ -34,3 +34,10 @@ uri = "file://nuasa-go54-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — GO54 Upload Package"
 description = "Unzip and upload all contents to your GO54 public root. The config.js inside is pre-configured to call the Replit API at https://nuasa-national-body--marlemqas123.replit.app/api"
+
+[[outputs]]
+id = "RUz0zVk3_SDuNeqsPvjdW"
+uri = "file://nuasa-afeeshost-dist.zip"
+type = "unspecified"
+title = "NUASA Frontend — AfeesHost Upload Package"
+description = "The Replit API URL is now baked directly into the JS bundle — no config.js dependency. Unzip and upload all contents to your AfeesHost public root."
