@@ -4,6 +4,10 @@ modules = ["nodejs-20", "web", "bash"]
 router = "application"
 deploymentTarget = "autoscale"
 
+[deployment.build]
+args = ["pnpm", "install", "--frozen-lockfile"]
+env = { "CI" = "true", "NODE_ENV" = "production" }
+
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
