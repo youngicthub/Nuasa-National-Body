@@ -90,15 +90,40 @@ const AdminExecutives = () => {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // DB uses: name, display_order, is_current — app UI uses: full_name, sort_order, is_active
+  const fromDb = (row: any): Executive => ({
+    id: row.id,
+    full_name: row.full_name ?? row.name ?? "",
+    position: row.position ?? "",
+    bio: row.bio ?? null,
+    image_url: row.image_url ?? null,
+    email: row.email ?? null,
+    phone: row.phone ?? null,
+    sort_order: row.sort_order ?? row.display_order ?? 0,
+    is_active: row.is_active ?? row.is_current ?? true,
+  });
+
+  const toDb = (e: Omit<Executive, "id">) => ({
+    name: e.full_name,
+    position: e.position,
+    bio: e.bio,
+    image_url: e.image_url,
+    email: e.email,
+    phone: e.phone,
+    display_order: e.sort_order,
+    is_current: e.is_active,
+    updated_at: new Date().toISOString(),
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ["admin-executives"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("executives")
         .select("*")
-        .order("sort_order", { ascending: true });
+        .order("display_order", { ascending: true });
       if (error) throw error;
-      return (data || []) as Executive[];
+      return (data || []).map(fromDb) as Executive[];
     },
   });
 
@@ -146,14 +171,14 @@ const AdminExecutives = () => {
         image_url = pub.publicUrl;
       }
 
-      const payload = { ...parsed.data, image_url, updated_at: new Date().toISOString() };
+      const dbPayload = toDb({ ...parsed.data, image_url });
 
       if (editing) {
-        const { error } = await (supabase as any).from("executives").update(payload).eq("id", editing.id);
+        const { error } = await (supabase as any).from("executives").update(dbPayload).eq("id", editing.id);
         if (error) throw error;
         toast.success("Executive updated");
       } else {
-        const { error } = await (supabase as any).from("executives").insert(payload);
+        const { error } = await (supabase as any).from("executives").insert({ id: crypto.randomUUID(), ...dbPayload, created_at: new Date().toISOString() });
         if (error) throw error;
         toast.success("Executive added");
       }

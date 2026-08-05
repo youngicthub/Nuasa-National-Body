@@ -219,7 +219,14 @@ router.post("/resources/:id/download", async (req, res, next) => {
 router.get("/executives", async (_req, res, next) => {
   try {
     const rows = await query<any[]>(
-      "SELECT * FROM executives WHERE is_active = 1 ORDER BY sort_order ASC",
+      `SELECT id, name AS full_name, position, portfolio, department,
+              institution, state, image_url, bio, email, phone,
+              linkedin_url, twitter_url, term_start, term_end,
+              is_current AS is_active, display_order AS sort_order,
+              created_at, updated_at
+       FROM executives
+       WHERE is_current = true
+       ORDER BY display_order ASC`,
     );
     res.json(rows);
   } catch (err) {
