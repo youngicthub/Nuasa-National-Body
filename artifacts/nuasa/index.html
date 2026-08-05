@@ -1,86 +1,24 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Favicon — NUASA National Logo -->
-  <link rel="icon" type="image/jpeg" href="/nuasa-logo.jpeg" />
-  <link rel="shortcut icon" href="/nuasa-logo.jpeg" />
-  <link rel="apple-touch-icon" href="/nuasa-logo.jpeg" />
-
-  <title>NUASA National Body — E-Library & Blog</title>
-
-  <meta name="description"
-    content="NUASA National Body E-Library & Blog: thousands of accounting resources, research papers, study guides, past questions, and articles for Nigerian students." />
-  <meta name="author" content="NUASA National Body" />
-  <meta name="google-site-verification" content="EtvBU03SmbBikKP6dmw3rBOTomzR01xnnU_6ESrAGlQ" />
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="NUASA National Body" />
-  <meta property="og:url" content="https://nuasanational.com.ng/" />
-  <meta property="og:image" content="https://nuasanational.com.ng/opengraph.jpg" />
-  <meta property="og:title" content="NUASA National Body — E-Library & Blog" />
-  <meta property="og:description"
-    content="National E-Library & Blog with thousands of accounting resources, research, and study materials for Nigerian students." />
-
-  <link rel="canonical" href="https://nuasanational.com.ng/" />
-
-  <!-- Apply saved theme before first paint to avoid flash -->
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem('nuasa-theme') || 'light';
-        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-      } catch (_) {}
-    })();
-  </script>
-
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@NUASANational" />
-  <meta name="twitter:image" content="https://nuasanational.com.ng/opengraph.jpg" />
-  <meta name="twitter:title" content="NUASA National Body — E-Library & Blog" />
-  <meta name="twitter:description"
-    content="National E-Library & Blog with thousands of accounting resources, research, and study materials for Nigerian students." />
-
-  <!-- Organization Schema -->
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "NUASA National Body",
-      "url": "https://nuasanational.com.ng/",
-      "logo": "https://nuasanational.com.ng/nuasa-logo.jpeg",
-      "description": "National Union of Accountancy Students Association — National Body E-Library & Blog for Nigerian accounting students.",
-      "sameAs": []
-    }
-  </script>
-
-  <!-- Website Schema -->
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "NUASA National Body",
-      "url": "https://nuasanational.com.ng/",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://nuasanational.com.ng/library?search={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
-    }
-  </script>
-</head>
-
-<body>
-  <div id="root"></div>
-  <!-- Runtime API URL config — edit on your hosting server to change the backend URL -->
-  <script src="/config.js"></script>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>NUASA</title>
+    <meta name="description" content="NUASA — built on Replit. Update this description to reflect the app." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="NUASA" />
+    <meta property="og:description" content="NUASA — built on Replit. Update this description to reflect the app." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="NUASA" />
+    <meta name="twitter:description" content="NUASA — built on Replit. Update this description to reflect the app." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
