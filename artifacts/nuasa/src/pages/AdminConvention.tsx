@@ -78,12 +78,25 @@ const AdminConvention = () => {
   const stats = useMemo(() => {
     const all = data || [];
     const ok = all.filter(r => r.payment_status === "successful");
-    const revenue = ok.reduce((s, r) => s + Number(r.amount), 0);
     const totalAmount = all.reduce((s, r) => s + Number(r.amount || 0), 0);
-    // count and amount for ALL registrations of each type (any payment status)
-    const countBy = (t: string) => all.filter(r => r.registration_type === t).length;
-    const amtBy = (t: string) =>
-      all.filter(r => r.registration_type === t).reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // per-type: successful count, revenue, and derived per-unit fee
+    const okStudents  = ok.filter(r => r.registration_type === "student");
+    const okGraduates = ok.filter(r => r.registration_type === "graduate");
+    const okChapters  = ok.filter(r => r.registration_type === "chapter");
+
+    const studentsOk  = okStudents.length;
+    const studentsRev = okStudents.reduce((s, r) => s + Number(r.amount), 0);
+    const studentsUnit = studentsOk > 0 ? Math.round(studentsRev / studentsOk) : 0;
+
+    const graduatesOk  = okGraduates.length;
+    const graduatesRev = okGraduates.reduce((s, r) => s + Number(r.amount), 0);
+    const graduatesUnit = graduatesOk > 0 ? Math.round(graduatesRev / graduatesOk) : 0;
+
+    const chaptersOk  = okChapters.length;
+    const chaptersRev = okChapters.reduce((s, r) => s + Number(r.amount), 0);
+    const chaptersUnit = chaptersOk > 0 ? Math.round(chaptersRev / chaptersOk) : 0;
+
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     return {
@@ -91,14 +104,10 @@ const AdminConvention = () => {
       successful: ok.length,
       pending: all.filter(r => r.payment_status === "pending").length,
       failed: all.filter(r => r.payment_status === "failed").length,
-      revenue,
       totalAmount,
-      students: countBy("student"),
-      studentsRev: amtBy("student"),
-      graduates: countBy("graduate"),
-      graduatesRev: amtBy("graduate"),
-      chapters: countBy("chapter"),
-      chaptersRev: amtBy("chapter"),
+      studentsOk, studentsRev, studentsUnit,
+      graduatesOk, graduatesRev, graduatesUnit,
+      chaptersOk, chaptersRev, chaptersUnit,
       today: all.filter(r => new Date(r.created_at) >= today).length,
       month: all.filter(r => new Date(r.created_at) >= startMonth).length,
     };
@@ -201,11 +210,23 @@ const AdminConvention = () => {
   ];
 
   const row2Cards = [
-    { label: "This Month", value: String(stats.month) },
-    { label: "Students (count / NGN)", value: `${stats.students} / ${stats.studentsRev.toLocaleString()}` },
-    { label: "Graduates (count / NGN)", value: `${stats.graduates} / ${stats.graduatesRev.toLocaleString()}` },
-    { label: "Chapters (count / NGN)", value: `${stats.chapters} / ${stats.chaptersRev.toLocaleString()}` },
-    { label: "Total Revenue (NGN)", value: stats.totalAmount.toLocaleString() },
+    { label: "This Month", calc: null, total: String(stats.month) },
+    {
+      label: "Students",
+      calc: `${stats.studentsOk} successful × NGN ${stats.studentsUnit.toLocaleString()}`,
+      total: `NGN ${stats.studentsRev.toLocaleString()}`,
+    },
+    {
+      label: "Graduates",
+      calc: `${stats.graduatesOk} successful × NGN ${stats.graduatesUnit.toLocaleString()}`,
+      total: `NGN ${stats.graduatesRev.toLocaleString()}`,
+    },
+    {
+      label: "Chapters",
+      calc: `${stats.chaptersOk} successful × NGN ${stats.chaptersUnit.toLocaleString()}`,
+      total: `NGN ${stats.chaptersRev.toLocaleString()}`,
+    },
+    { label: "Total Revenue (NGN)", calc: null, total: stats.totalAmount.toLocaleString() },
   ];
 
   return (
@@ -244,12 +265,19 @@ const AdminConvention = () => {
             ))}
           </div>
 
-          {/* Row 2 — period + type + revenue */}
+          {/* Row 2 — period + type breakdown + revenue */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             {row2Cards.map(s => (
               <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                 <div className="text-xs text-gray-500 font-medium mb-1">{s.label}</div>
-                <div className="text-2xl font-bold text-gray-900">{s.value}</div>
+                {s.calc ? (
+                  <>
+                    <div className="text-xs text-gray-600 mt-1 leading-snug">{s.calc}</div>
+                    <div className="text-lg font-bold text-gray-900 mt-1">= {s.total}</div>
+                  </>
+                ) : (
+                  <div className="text-2xl font-bold text-gray-900">{s.total}</div>
+                )}
               </div>
             ))}
           </div>
