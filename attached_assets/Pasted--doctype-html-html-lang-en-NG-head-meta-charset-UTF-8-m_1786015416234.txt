@@ -2,6 +2,7 @@
 <html lang="en-NG">
 <head>
   <meta charset="UTF-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>NUASA National Body | Accounting E-Library & Blog</title>
@@ -11,10 +12,12 @@
     name="description"
     content="Explore the NUASA National Body E-Library and Blog for accounting students in Nigeria. Access accounting study materials, research papers, past questions, academic resources, and educational articles."
   />
+
   <meta
     name="keywords"
     content="NUASA, NUASA National Body, accounting students Nigeria, accounting e-library, accounting study materials, accounting past questions, accounting research papers, Nigerian accounting students"
   />
+
   <meta name="author" content="NUASA National Body" />
   <meta name="robots" content="index, follow" />
   <meta name="googlebot" content="index, follow" />
@@ -85,11 +88,24 @@
   }
   </script>
 
-  <!-- Runtime configuration (sets window.__NUASA_API_URL__ before the bundle loads) -->
+  <!-- Runtime configuration -->
   <script src="/config.js"></script>
+
+  <!-- Application assets -->
+  <link
+    rel="stylesheet"
+    href="/assets/index-D2qf8ap8.css"
+    crossorigin
+  />
+
+  <script
+    type="module"
+    src="/assets/index-DoRPPVyr.js"
+    crossorigin
+  ></script>
 </head>
+
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
