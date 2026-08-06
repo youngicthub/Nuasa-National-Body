@@ -145,7 +145,7 @@ router.get("/events", async (_req, res, next) => {
 router.get("/chapters", async (_req, res, next) => {
   try {
     const rows = await query<any[]>(
-      "SELECT * FROM chapters WHERE is_active = 1 ORDER BY display_order ASC, name ASC",
+      "SELECT * FROM chapters WHERE is_active = true ORDER BY display_order ASC, name ASC",
     );
     res.json(rows);
   } catch (err) {

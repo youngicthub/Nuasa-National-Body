@@ -80,8 +80,9 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
     }
     const id = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
+    // email_verified=true — no verification step required; all accounts can log in immediately.
     await query(
-      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+      "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
       [id, email.toLowerCase(), passwordHash],
     );
     await query(
@@ -92,24 +93,6 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
       "INSERT INTO user_roles (id, user_id, role, created_at) VALUES (?, ?, 'user', CURRENT_TIMESTAMP)",
       [crypto.randomUUID(), id],
     );
-
-    try {
-      const rawToken = await issueVerificationToken(id);
-      const origin = process.env.FRONTEND_URL || process.env.APP_ORIGIN || "http://localhost";
-      const link = `${origin}/verify-email?token=${rawToken}`;
-      if (process.env.SMTP_HOST) {
-        await sendMail(
-          email.toLowerCase(),
-          "Verify your NUASA account",
-          `Welcome to NUASA! Please verify your email:\n\n${link}\n\nThis link expires in 24 hours.`,
-          `<p>Welcome to NUASA!</p><p>Please verify your email address: <a href="${link}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
-        );
-      } else {
-        console.info("[auth] Email verification token (no SMTP configured):", rawToken);
-      }
-    } catch (emailErr) {
-      console.error("[auth] Failed to send verification email:", emailErr);
-    }
 
     const user = { id, email: email.toLowerCase(), role: "user" as const, full_name: metadata.full_name || "User" };
     res.status(201).json({
@@ -201,13 +184,7 @@ router.post("/signin", strictLimiter, async (req, res, next) => {
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
-    if (!row.email_verified) {
-      res.status(403).json({
-        error: "Please verify your email before signing in.",
-        code: "EMAIL_NOT_VERIFIED",
-      });
-      return;
-    }
+    // Email verification is disabled — all accounts can sign in immediately.
     const user = { id: row.id, email: row.email, role: row.role, full_name: row.full_name };
     const access_token = issueToken(user);
     res.json({ user: publicUser(row), session: { access_token, user: publicUser(row) } });
