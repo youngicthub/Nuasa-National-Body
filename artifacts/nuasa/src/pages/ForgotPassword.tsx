@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { SEO } from "@/components/SEO";
+import { getApiBase } from "@/lib/api";
 
 type Step = "email" | "otp" | "password" | "done";
 
@@ -37,7 +38,7 @@ const ForgotPassword = () => {
     if (!email) return;
     setLoadingEmail(true);
     try {
-      const res = await fetch("/api/auth/reset-password", {
+      const res = await fetch(`${getApiBase()}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.toLowerCase().trim() }),
@@ -85,7 +86,7 @@ const ForgotPassword = () => {
     if (password !== confirm) { toast.error("Passwords do not match"); return; }
     setLoadingPw(true);
     try {
-      const res = await fetch("/api/auth/reset-password", {
+      const res = await fetch(`${getApiBase()}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.toLowerCase().trim(), otp: generatedOtp, password }),

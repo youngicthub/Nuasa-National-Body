@@ -16,14 +16,6 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -39,9 +31,6 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotLoading, setForgotLoading] = useState(false);
 
   // Redirect once auth context confirms admin role — avoids flicker/redirect loops
   useEffect(() => {
@@ -117,22 +106,8 @@ const AdminLogin = () => {
     navigate("/admin/dashboard", { replace: true });
   };
 
-  const handleForgot = async () => {
-    if (!forgotEmail) {
-      toast.error("Enter your admin email");
-      return;
-    }
-    setForgotLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${window.location.origin}/admin/reset-password`,
-    });
-    setForgotLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Password reset email sent. Check your inbox.");
-    setForgotOpen(false);
+  const handleForgot = () => {
+    navigate("/forgot-password");
   };
 
   return (
@@ -179,10 +154,7 @@ const AdminLogin = () => {
                 <Label htmlFor='password'>Password</Label>
                 <button
                   type='button'
-                  onClick={() => {
-                    setForgotEmail(email);
-                    setForgotOpen(true);
-                  }}
+                  onClick={handleForgot}
                   className='text-xs text-accent hover:underline'
                 >
                   Forgot password?
@@ -258,42 +230,6 @@ const AdminLogin = () => {
         </p>
       </motion.div>
 
-      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset admin password</DialogTitle>
-            <DialogDescription>
-              We'll email you a secure link to set a new password.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='space-y-2 py-2'>
-            <Label htmlFor='forgot-email'>Admin email</Label>
-            <Input
-              id='forgot-email'
-              type='email'
-              value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
-              placeholder='admin@nuasa.org'
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant='outline'
-              onClick={() => setForgotOpen(false)}
-              disabled={forgotLoading}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleForgot} disabled={forgotLoading}>
-              {forgotLoading ? (
-                <Loader2 className='w-4 h-4 animate-spin' />
-              ) : (
-                "Send reset link"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
