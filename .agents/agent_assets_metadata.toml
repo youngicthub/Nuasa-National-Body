@@ -12,7 +12,7 @@ id = "Lot82zeTf9fVUW37EYQbF"
 uri = "file://nuasa-frontend-dist.zip"
 type = "unspecified"
 title = "NUASA Frontend — dist (afeeshost deploy)"
-description = "Production build of the NUASA frontend. Unzip and upload the contents of dist/public/ to your afeeshost web root. config.js inside already points to the live Replit API."
+description = "Production build with all latest changes. Unzip and upload the contents of dist/public/ to your afeeshost web root. config.js already points to the live Replit API."
 
 [[outputs]]
 id = "wuv3wEcQbksV3vGAxIn8S"
