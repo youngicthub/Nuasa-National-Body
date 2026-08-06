@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start-api.sh — starts MySQL (if not using Neon) then the API server
+# start-api.sh — starts PostgreSQL then the API server
 set -euo pipefail
 
 # ── Base URL auto-detection ───────────────────────────────────────────────────
@@ -10,110 +10,96 @@ else
 fi
 echo "[start-api] FRONTEND_URL=${FRONTEND_URL}"
 
-# ── If Neon database URL is configured, skip MySQL entirely ───────────────────
+# ── If a remote database URL is configured, skip local PostgreSQL ─────────────
 if [ -n "${NEON_DATABASE_URL:-}" ]; then
-  echo "[start-api] NEON_DATABASE_URL detected — skipping MySQL, using Neon PostgreSQL"
+  echo "[start-api] NEON_DATABASE_URL detected — skipping local PostgreSQL"
   cd /home/runner/workspace/artifacts/api-server
   echo "[start-api] Building API server..."
-  npm run build
+  pnpm run build
   echo "[start-api] Starting API server..."
   exec node --enable-source-maps ./dist/index.mjs
 fi
 
-# ── MySQL path (local development fallback) ───────────────────────────────────
-MYSQL_DATADIR="/home/runner/.mysql-data"
-MYSQL_RUNDIR="/home/runner/.mysql-run"
-MYSQL_SOCK="$MYSQL_RUNDIR/mysqld.sock"
-MYSQL_LOG="$MYSQL_RUNDIR/error.log"
-MYSQL_BASEDIR="/nix/store/s2lbn1axpc79kwnc829k5idkwabfq459-mysql-8.0.42"
-DB_NAME="${DB_NAME:-nuasa_database}"
-DB_USER="${DB_USER:-nuasa_user}"
-DB_PASSWORD="${DB_PASSWORD:-}"
+# ── Local PostgreSQL (dev fallback) ───────────────────────────────────────────
+PG_BIN="/nix/store/p1bjsswnxgb73742slz0w2h0049nydk2-replit-runtime-path/bin"
+PG_DATADIR="/home/runner/.pg-data"
+PG_RUNDIR="/home/runner/.pg-run"
+PG_PORT=5432
+_DB_NAME="${DB_NAME:-nuasa_database}"
+_DB_USER="${DB_USER:-nuasa_user}"
+_DB_PASS="${DB_PASSWORD:-nuasa_pass_2026}"
 
-MYSQLD_ARGS=(
-  --datadir="$MYSQL_DATADIR"
-  --basedir="$MYSQL_BASEDIR"
-  --socket="$MYSQL_SOCK"
-  --pid-file="$MYSQL_RUNDIR/mysqld.pid"
-  --log-error="$MYSQL_LOG"
-  --port=3306
-  --bind-address=127.0.0.1
-  --mysqlx=OFF
-  --user=runner
-)
+mkdir -p "$PG_DATADIR" "$PG_RUNDIR"
 
-mkdir -p "$MYSQL_DATADIR" "$MYSQL_RUNDIR"
-
-if [ ! -f "$MYSQL_DATADIR/mysql.ibd" ]; then
-  echo "[start-api] Initializing MySQL data directory..."
-  rm -f "$MYSQL_DATADIR/is_writable" "$MYSQL_DATADIR/is_readable" \
-        "$MYSQL_DATADIR"/*.pem 2>/dev/null || true
-  mysqld \
-    --initialize-insecure \
-    --datadir="$MYSQL_DATADIR" \
-    --basedir="$MYSQL_BASEDIR" \
-    --user=runner 2>&1
+# Initialise data directory on first boot
+if [ ! -f "$PG_DATADIR/PG_VERSION" ]; then
+  echo "[start-api] Initializing PostgreSQL data directory..."
+  "$PG_BIN/initdb" -D "$PG_DATADIR" \
+    --username=runner \
+    --auth=trust \
+    --encoding=UTF8 \
+    --locale=C 2>&1
   echo "[start-api] Init complete"
 fi
 
-rm -f "$MYSQL_SOCK" "$MYSQL_RUNDIR/mysqld.sock.lock" "$MYSQL_RUNDIR/mysqld.pid"
-rm -f "$MYSQL_DATADIR"/undo_*
+# Remove stale socket / lock files
+rm -f "$PG_RUNDIR"/.s.PGSQL.* 2>/dev/null || true
 
-echo "[start-api] Starting mysqld..."
-mysqld "${MYSQLD_ARGS[@]}" &
-MYSQLD_PID=$!
+echo "[start-api] Starting PostgreSQL..."
+"$PG_BIN/postgres" \
+  -D "$PG_DATADIR" \
+  -k "$PG_RUNDIR" \
+  -p "$PG_PORT" \
+  -c log_destination=stderr \
+  -c logging_collector=off \
+  &
+POSTGRES_PID=$!
 
 cleanup() {
-  echo "[start-api] Shutting down mysqld (pid $MYSQLD_PID)..."
-  mysqladmin --socket="$MYSQL_SOCK" shutdown 2>/dev/null \
-    || kill "$MYSQLD_PID" 2>/dev/null \
-    || true
-  wait "$MYSQLD_PID" 2>/dev/null || true
+  echo "[start-api] Shutting down PostgreSQL (pid $POSTGRES_PID)..."
+  kill "$POSTGRES_PID" 2>/dev/null || true
+  wait "$POSTGRES_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
-echo "[start-api] Waiting for MySQL..."
+echo "[start-api] Waiting for PostgreSQL..."
 for i in $(seq 1 30); do
-  if mysqladmin --socket="$MYSQL_SOCK" ping --silent 2>/dev/null; then
-    echo "[start-api] MySQL ready after ${i}s"
+  if "$PG_BIN/pg_isready" -h 127.0.0.1 -p "$PG_PORT" -U runner -q 2>/dev/null; then
+    echo "[start-api] PostgreSQL ready after ${i}s"
     break
   fi
   sleep 1
-  if ! kill -0 "$MYSQLD_PID" 2>/dev/null; then
-    echo "[start-api] mysqld exited unexpectedly. Last log:"
-    tail -20 "$MYSQL_LOG"
+  if ! kill -0 "$POSTGRES_PID" 2>/dev/null; then
+    echo "[start-api] postgres exited unexpectedly"
     exit 1
   fi
   if [ "$i" -eq 30 ]; then
-    echo "[start-api] MySQL did not start in 30s. Last log:"
-    tail -20 "$MYSQL_LOG"
+    echo "[start-api] PostgreSQL did not start in 30s"
     exit 1
   fi
 done
 
-SETUP_MARKER="$MYSQL_RUNDIR/.db_setup_done"
+# Override DB connection env vars so the pg driver connects to local PG
+export DB_HOST=127.0.0.1
+export DB_PORT="$PG_PORT"
+export DB_USER="$_DB_USER"
+export DB_NAME="$_DB_NAME"
+export DB_PASSWORD="$_DB_PASS"
+
+SETUP_MARKER="$PG_RUNDIR/.db_setup_done"
 if [ ! -f "$SETUP_MARKER" ]; then
   echo "[start-api] Running first-time DB setup..."
-  mysql -u root --socket="$MYSQL_SOCK" <<SQL
-CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
-CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';
-FLUSH PRIVILEGES;
-SQL
+  "$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U runner -d postgres \
+    -c "CREATE USER \"${_DB_USER}\" WITH PASSWORD '${_DB_PASS}';" 2>/dev/null || true
+  "$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U runner -d postgres \
+    -c "CREATE DATABASE \"${_DB_NAME}\" OWNER \"${_DB_USER}\";" 2>/dev/null || true
 
-  SCHEMA_FILE="/home/runner/workspace/database.sql"
+  SCHEMA_FILE="/home/runner/workspace/scripts/postgres-schema.sql"
   if [ -f "$SCHEMA_FILE" ]; then
-    TABLE_COUNT=$(mysql -u root --socket="$MYSQL_SOCK" -N -e \
-      "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME}';" 2>/dev/null || echo 0)
-    if [ "${TABLE_COUNT}" -eq 0 ]; then
-      echo "[start-api] Importing schema from database.sql..."
-      mysql -u root --socket="$MYSQL_SOCK" "${DB_NAME}" < "$SCHEMA_FILE"
-      echo "[start-api] Schema imported successfully"
-    else
-      echo "[start-api] Schema already present (${TABLE_COUNT} tables), skipping"
-    fi
+    echo "[start-api] Importing PostgreSQL schema..."
+    "$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U runner -d "$_DB_NAME" \
+      -f "$SCHEMA_FILE" 2>&1
+    echo "[start-api] Schema imported successfully"
   fi
 
   touch "$SETUP_MARKER"
@@ -122,7 +108,7 @@ fi
 
 cd /home/runner/workspace/artifacts/api-server
 echo "[start-api] Building API server..."
-npm run build
+pnpm run build
 
 echo "[start-api] Starting API server..."
 exec node --enable-source-maps ./dist/index.mjs

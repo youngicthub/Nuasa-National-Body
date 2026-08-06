@@ -1,6 +1,6 @@
 - [NUASA migration - Supabase kept](nuasa-supabase-kept.md) — App kept Supabase connection; replacing with Replit primitives is a separate task.
 - [Neon schema vs app schema mismatch](neon-schema-mismatch.md) — Neon DB has old Supabase schema; several convention_registrations and site_visits columns had to be added manually.
-- [MySQL 8.0 undo tablespace fix (Nix)](mysql-undo-restart-fix.md) — Always delete undo_* from datadir before every mysqld start; 8.0.42 on Nix recreates them on every boot and crashes if they exist.
+- [MySQL replaced with PostgreSQL in dev](mysql-to-pg-switch.md) — db.ts uses pg driver; start-api.sh now starts local PostgreSQL (Nix replit-runtime-path bin) on port 5432 and overrides DB_PORT=5432. PostgreSQL schema is in scripts/postgres-schema.sql.
 - [Lovable migration CSS fix](lovable-css-fix.md) — Lovable apps use @import before @tailwind; copy script doesn't fix this.
 - [Artifact workflows](artifact-workflows.md) — Use artifact-managed service workflows as canonical; remove duplicate legacy workflows after artifact registration.
 - [NUASA API URL config](nuasa-api-url-config.md) — config.js/VITE_API_URL must be unset in dev or CORS breaks; only set the production URL in the afeeshost-deployed config.js.

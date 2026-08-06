@@ -85,26 +85,154 @@ router.get("/admin/transactions", requireAdmin, async (_req, res, next) => {
 
 /**
  * POST /api/admin/transactions/:id/verify
- * Stub — returns manual-verification status until a live Flutterwave
- * webhook / secret-key call is wired in.
+ * Calls Flutterwave /v3/transactions/:id/verify using the stored secret key,
+ * then updates payment_status accordingly.
  */
 router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, next) => {
   try {
-    const rows = await query<{ flw_transaction_id: string; tx_ref: string }[]>(
-      "SELECT flw_transaction_id, tx_ref FROM convention_registrations WHERE id = ? LIMIT 1",
+    const rows = await query<{
+      id: string; flw_transaction_id: string | null; tx_ref: string; amount: number; payment_status: string;
+    }[]>(
+      "SELECT id, flw_transaction_id, tx_ref, amount, payment_status FROM convention_registrations WHERE id = ? LIMIT 1",
       [req.params.id],
     );
     if (!rows.length) {
       res.status(404).json({ data: null, error: { message: "Registration not found" } });
       return;
     }
-    const { flw_transaction_id, tx_ref } = rows[0];
-    if (!flw_transaction_id || !tx_ref) {
-      res.status(400).json({ data: null, error: { message: "No Flutterwave reference on this record" } });
+    const reg = rows[0];
+
+    // Allow manual override via request body: { status: "successful" | "failed" }
+    const manualStatus = (req.body?.status || "").toLowerCase();
+    if (manualStatus === "successful" || manualStatus === "failed" || manualStatus === "pending") {
+      await query(
+        "UPDATE convention_registrations SET payment_status = ?, updated_at = NOW() WHERE id = ?",
+        [manualStatus, reg.id],
+      );
+      res.json({ data: { success: true, status: manualStatus, source: "manual" }, error: null });
       return;
     }
-    // TODO: call Flutterwave /v3/transactions/:id/verify using secret_key from app_settings
-    res.json({ data: { success: false, status: "manual verification required" }, error: null });
+
+    if (!reg.flw_transaction_id) {
+      res.status(400).json({ data: null, error: { message: "No Flutterwave transaction ID on this record. Use manual override by passing { status: 'successful' } in the request body." } });
+      return;
+    }
+
+    // Get Flutterwave secret key from app_settings or env
+    let secretKey = process.env.FLUTTERWAVE_SECRET_KEY || "";
+    try {
+      const settingsRows = await query<{ value: unknown }[]>(
+        "SELECT value FROM app_settings WHERE key = 'flutterwave' LIMIT 1",
+      );
+      if (settingsRows[0]?.value) {
+        const v = parseJson(settingsRows[0].value);
+        if (v.secret_key) secretKey = v.secret_key;
+      }
+    } catch { /* use env fallback */ }
+
+    if (!secretKey) {
+      res.status(400).json({ data: null, error: { message: "Flutterwave secret key not configured. Set it in Admin → Settings or use manual override." } });
+      return;
+    }
+
+    // Call Flutterwave verify endpoint
+    const flwRes = await fetch(
+      `https://api.flutterwave.com/v3/transactions/${reg.flw_transaction_id}/verify`,
+      { headers: { Authorization: `Bearer ${secretKey}` } },
+    );
+    const flwData = await flwRes.json() as any;
+
+    if (flwData?.status !== "success" || !flwData?.data) {
+      res.json({ data: { success: false, status: "failed", flw_message: flwData?.message }, error: null });
+      return;
+    }
+
+    const txData = flwData.data;
+    const paid = txData.status === "successful"
+      && txData.currency === "NGN"
+      && Number(txData.amount) >= Number(reg.amount);
+
+    const newStatus = paid ? "successful" : "failed";
+    await query(
+      "UPDATE convention_registrations SET payment_status = ?, updated_at = NOW() WHERE id = ?",
+      [newStatus, reg.id],
+    );
+
+    res.json({ data: { success: paid, status: newStatus, flw_status: txData.status }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/admin/transactions/:id/mark
+ * Manually set payment_status to any valid value (successful / pending / failed).
+ */
+router.post("/admin/transactions/:id/mark", requireAdmin, async (req, res, next) => {
+  try {
+    const status = (req.body?.status || "").toLowerCase();
+    if (!["successful", "pending", "failed"].includes(status)) {
+      res.status(400).json({ data: null, error: { message: "status must be 'successful', 'pending', or 'failed'" } });
+      return;
+    }
+    const rows = await query<{ id: string }[]>(
+      "SELECT id FROM convention_registrations WHERE id = ? LIMIT 1",
+      [req.params.id],
+    );
+    if (!rows.length) {
+      res.status(404).json({ data: null, error: { message: "Registration not found" } });
+      return;
+    }
+    await query(
+      "UPDATE convention_registrations SET payment_status = ?, updated_at = NOW() WHERE id = ?",
+      [status, req.params.id],
+    );
+    res.json({ data: { success: true, status }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/admin/registrations/by-email
+ * Deletes convention registrations (and associated user accounts) for a list
+ * of email addresses.  Body: { emails: string[] }
+ */
+router.delete("/admin/registrations/by-email", requireAdmin, async (req, res, next) => {
+  try {
+    const emails: string[] = (req.body?.emails || [])
+      .map((e: unknown) => String(e).toLowerCase().trim())
+      .filter(Boolean);
+    if (!emails.length) {
+      res.status(400).json({ data: null, error: { message: "emails array is required" } });
+      return;
+    }
+    const placeholders = emails.map(() => "?").join(",");
+    // Delete convention registrations
+    await query(
+      `DELETE FROM convention_registrations WHERE LOWER(email) IN (${placeholders})`,
+      emails,
+    );
+    // Find user IDs for those emails
+    const userRows = await query<{ id: string }[]>(
+      `SELECT id FROM users WHERE LOWER(email) IN (${placeholders})`,
+      emails,
+    );
+    for (const { id } of userRows) {
+      await query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [id]);
+      await query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [id]);
+      await query("DELETE FROM auth_tokens WHERE user_id = ?", [id]);
+      await query("DELETE FROM saved_posts WHERE user_id = ?", [id]);
+      await query("DELETE FROM saved_resources WHERE user_id = ?", [id]);
+      await query("DELETE FROM post_views WHERE user_id = ?", [id]);
+      await query("DELETE FROM resource_views WHERE user_id = ?", [id]);
+      await query("DELETE FROM resource_downloads WHERE user_id = ?", [id]);
+      await query("DELETE FROM admin_login_log WHERE user_id = ?", [id]);
+      await query("DELETE FROM user_roles WHERE user_id = ?", [id]);
+      await query("DELETE FROM profiles WHERE user_id = ?", [id]);
+      await query("DELETE FROM users WHERE id = ?", [id]);
+    }
+    res.json({ data: { deleted_registrations: emails.length, deleted_users: userRows.length }, error: null });
   } catch (err) {
     next(err);
   }

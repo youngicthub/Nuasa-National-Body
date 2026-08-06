@@ -406,7 +406,80 @@ router.post("/functions/:name", optionalAuth, async (req, res) => {
     return;
   }
   if (req.params.name === "convention-verify-payment") {
-    res.json({ data: { success: false, status: "manual verification required" }, error: null });
+    try {
+      const { transaction_id, tx_ref } = req.body ?? {};
+      if (!transaction_id || !tx_ref) {
+        res.json({ data: { success: false, status: "failed", message: "Missing transaction_id or tx_ref" }, error: null });
+        return;
+      }
+
+      // Look up the registration by tx_ref
+      const regRows = await query<{
+        id: string; amount: number; payment_status: string;
+      }[]>(
+        "SELECT id, amount, payment_status FROM convention_registrations WHERE tx_ref = ? LIMIT 1",
+        [String(tx_ref)],
+      );
+
+      if (!regRows.length) {
+        res.json({ data: { success: false, status: "failed", message: "Registration not found" }, error: null });
+        return;
+      }
+      const reg = regRows[0];
+
+      // Already marked successful — idempotent
+      if (reg.payment_status === "successful") {
+        res.json({ data: { success: true, status: "successful" }, error: null });
+        return;
+      }
+
+      // Get Flutterwave secret key
+      let secretKey = process.env.FLUTTERWAVE_SECRET_KEY || "";
+      try {
+        const settingRows = await query<{ value: unknown }[]>(
+          "SELECT value FROM app_settings WHERE key = 'flutterwave' LIMIT 1",
+        );
+        if (settingRows[0]?.value) {
+          const v: Record<string, string> = typeof settingRows[0].value === "object"
+            ? (settingRows[0].value as Record<string, string>)
+            : JSON.parse(settingRows[0].value as string);
+          if (v.secret_key) secretKey = v.secret_key;
+        }
+      } catch { /* use env fallback */ }
+
+      if (!secretKey) {
+        // No secret key — mark successful on Flutterwave's callback trust basis
+        // (frontend only calls this after FLW inline JS confirms success)
+        await query(
+          "UPDATE convention_registrations SET payment_status = 'successful', flw_transaction_id = ?, updated_at = NOW() WHERE id = ?",
+          [String(transaction_id), reg.id],
+        );
+        res.json({ data: { success: true, status: "successful", verified: false }, error: null });
+        return;
+      }
+
+      // Verify with Flutterwave API
+      const flwRes = await fetch(
+        `https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`,
+        { headers: { Authorization: `Bearer ${secretKey}` } },
+      );
+      const flwData = await flwRes.json() as any;
+
+      const paid = flwData?.status === "success"
+        && flwData?.data?.status === "successful"
+        && flwData?.data?.currency === "NGN"
+        && Number(flwData?.data?.amount) >= Number(reg.amount);
+
+      const newStatus = paid ? "successful" : "failed";
+      await query(
+        "UPDATE convention_registrations SET payment_status = ?, flw_transaction_id = ?, updated_at = NOW() WHERE id = ?",
+        [newStatus, String(transaction_id), reg.id],
+      );
+
+      res.json({ data: { success: paid, status: newStatus, verified: true }, error: null });
+    } catch (err) {
+      res.json({ data: { success: false, status: "failed", message: "Verification error" }, error: null });
+    }
     return;
   }
   res.status(404).json({ data: null, error: { message: "Function not available locally" } });

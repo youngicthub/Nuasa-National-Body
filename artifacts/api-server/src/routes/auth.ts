@@ -442,21 +442,54 @@ router.delete("/users/:id", async (req, res, next) => {
       return;
     }
     const targetId = req.params.id;
-    if (!targetId || targetId === authUser.id) {
+    if (!targetId) {
+      res.status(400).json({ error: "User ID is required" });
+      return;
+    }
+    if (targetId === authUser.id) {
       res.status(400).json({ error: "Cannot delete your own account" });
       return;
     }
-    await query("DELETE FROM auth_tokens WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM saved_posts WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM saved_resources WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM post_views WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM resource_views WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM resource_downloads WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM convention_registrations WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM admin_login_log WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM user_roles WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM profiles WHERE user_id = ?", [targetId]);
-    await query("DELETE FROM users WHERE id = ?", [targetId]);
+
+    // The admin users list returns COALESCE(u.id, cr.id) as the row id.
+    // First look up the actual users.id — fall back to treating targetId as
+    // a convention_registrations.id when no user row is found.
+    const userRows = await query<{ id: string }[]>(
+      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      [targetId],
+    );
+
+    if (userRows.length > 0) {
+      // Full user account — delete all associated data then the user row.
+      // user_roles, profiles, and auth_tokens cascade on DELETE in the FK
+      // definition, but we delete explicitly for safety.
+      await query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [targetId]);
+      await query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [targetId]);
+      await query("DELETE FROM auth_tokens WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM saved_posts WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM saved_resources WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM post_views WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM resource_views WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM resource_downloads WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM convention_registrations WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM admin_login_log WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM user_roles WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM profiles WHERE user_id = ?", [targetId]);
+      await query("DELETE FROM users WHERE id = ?", [targetId]);
+    } else {
+      // Convention-only registrant with no user account — targetId is the
+      // convention_registrations.id.  Just delete the registration row.
+      const crRows = await query<{ id: string }[]>(
+        "SELECT id FROM convention_registrations WHERE id = ? LIMIT 1",
+        [targetId],
+      );
+      if (!crRows.length) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      await query("DELETE FROM convention_registrations WHERE id = ?", [targetId]);
+    }
+
     res.json({ success: true });
   } catch (err) {
     next(err);
