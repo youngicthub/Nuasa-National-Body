@@ -7,22 +7,22 @@ A full-stack e-library platform for NUASA (National University Academic Staff As
 | Layer | Tech |
 |---|---|
 | Frontend | React 19, Vite, TypeScript, shadcn-ui, Tailwind CSS, Framer Motion |
-| Backend API | Express 5, TypeScript, Pino logging, mysql2 |
-| Database | MySQL 8 (embedded, starts automatically via `scripts/start-api.sh`) |
+| Backend API | Express 5, TypeScript, Pino logging, `pg` |
+| Database | PostgreSQL (local development fallback, starts automatically via `scripts/start-api.sh`) |
 | Monorepo | pnpm workspace (also has npm workspace root scripts) |
 
 ## How to run on Replit
 
 Both services start automatically via their configured workflows:
 
-- **Frontend** — workflow `artifacts/nuasa: web` — `PORT=21844 BASE_PATH=/ npm --prefix artifacts/nuasa run dev`
-- **API Server** — workflow `artifacts/api-server: API Server` — `PORT=8080 bash scripts/start-api.sh`
+- **Frontend** — workflow `artifacts/nuasa: web` — `pnpm --filter @workspace/nuasa run dev`
+- **API Server** — workflow `artifacts/api-server: API Server` — `bash scripts/start-api.sh`
 
 The frontend is served at `/` (port 21844) and the API at port 8080.
 
-The Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests to `http://127.0.0.1:8080`.
+In Replit development, `artifacts/nuasa/public/config.js` leaves the production API URL disabled, so the Vite dev proxy (`artifacts/nuasa/vite.config.ts`) forwards `/api/*` requests to `http://127.0.0.1:8080`. The production API URL remains in that file as a commented runtime setting and can be enabled for the separately hosted frontend.
 
-`scripts/start-api.sh` handles MySQL init, DB/user/schema setup on first run (`database.sql`), builds the TypeScript API, then starts it. MySQL data lives in `~/.mysql-data`; socket at `~/.mysql-run/mysqld.sock`. The setup marker at `~/.mysql-run/.db_setup_done` prevents re-running schema import on subsequent starts.
+`scripts/start-api.sh` handles PostgreSQL init, DB/user/schema setup on first run (`scripts/postgres-schema.sql`), builds the TypeScript API, then starts it. Local PostgreSQL data lives in `~/.pg-data`, with its socket in `~/.pg-run`. The setup marker at `~/.pg-run/.db_setup_done` prevents re-running schema import on subsequent starts.
 
 **Install dependencies** (run once after cloning or if node_modules is missing):
 ```bash
@@ -37,13 +37,12 @@ bash scripts/start-local.sh
 
 This will:
 1. Load your `.env` file (copy from `.env.example` and fill it in first)
-2. Create the MySQL database and user if they don't exist
-3. Import `database.sql` (first run only — skipped if tables already exist)
-4. Install pnpm dependencies if needed
-5. Build + start the API server in the background → `http://localhost:5000`
-6. Start the Vite frontend → `http://localhost:5173`
+2. Start the local PostgreSQL fallback and create the database/user if needed
+3. Import `scripts/postgres-schema.sql` (first run only)
+4. Build and start the API server → `http://localhost:8080`
+5. Start the Vite frontend → `http://localhost:5173`
 
-**Pre-requisites:** Node.js 20+, pnpm, and MySQL 8.0 running locally.
+**Pre-requisites:** Node.js 20+ and pnpm. A local PostgreSQL installation is not required when using `scripts/start-api.sh`.
 
 ### Base URL (FRONTEND_URL) — auto-detected
 
@@ -56,15 +55,15 @@ Used in auth email links (verification, password reset). Override by setting `FR
 
 ## Required secrets
 
-Add these in the Secrets panel (padlock icon) when you're ready to connect to live data:
+Keep the imported credentials in Replit Secrets; do not commit their values. The local fallback supplies development database defaults when a remote database URL is not configured. Add or retain these in the Secrets panel (padlock icon) when connecting to live data:
 
 | Secret | Used by | Description |
 |---|---|---|
 | `VITE_SUPABASE_URL` | Frontend | `https://xxxx.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Frontend | Supabase anon key |
-| `DB_HOST` | API Server | MySQL host (default: `127.0.0.1`) |
+| `DB_HOST` | API Server | PostgreSQL host (default: `127.0.0.1`) |
 | `DB_NAME` | API Server | Database name (default: `nuasa_database`) |
-| `DB_USER` | API Server | Database user (default: `root`) |
+| `DB_USER` | API Server | Database user (default: `nuasa_user`) |
 | `DB_PASSWORD` | API Server | Database password |
 | `JWT_SECRET` | API Server | Secret for signing JWTs |
 | `SMTP_HOST` | API Server | SMTP server for email |
@@ -79,7 +78,7 @@ artifacts/
   nuasa/          # React frontend
   api-server/     # Express API server
 lib/
-  db/             # MySQL pool + query helper
+  db/             # PostgreSQL pool + query helper
   api-spec/       # OpenAPI spec
   api-zod/        # Zod schemas
   api-client-react/ # React hooks for API
