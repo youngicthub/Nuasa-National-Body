@@ -5,7 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, ExternalLink, Search, Download, CheckCircle2 } from "lucide-react";
+import {
+  Loader2, RefreshCw, ExternalLink, Search, Download, CheckCircle2,
+  XCircle, Clock, ChevronDown,
+} from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -30,9 +36,10 @@ const STATUS_FILTERS = ["all", "successful", "pending", "failed"] as const;
 
 const AdminTransactions = () => {
   const qc = useQueryClient();
-  const [search, setSearch]       = useState("");
-  const [status, setStatus]       = useState<(typeof STATUS_FILTERS)[number]>("all");
+  const [search, setSearch]               = useState("");
+  const [status, setStatus]               = useState<(typeof STATUS_FILTERS)[number]>("all");
   const [verifying, setVerifying]         = useState<string | null>(null);
+  const [changingStatus, setChangingStatus] = useState<string | null>(null);
   const [markingAllPending, setMarkingAllPending] = useState(false);
 
   // ── Fetch transactions from local API ───────────────────────────────────
@@ -90,7 +97,26 @@ const AdminTransactions = () => {
     }
   };
 
-  // ── Verify payment ───────────────────────────────────────────────────────
+  // ── Manually set a single payment status ────────────────────────────────
+  const markStatus = async (r: Transaction, newStatus: "successful" | "pending" | "failed") => {
+    if (r.payment_status === newStatus) return;
+    setChangingStatus(r.id);
+    try {
+      await apiFetch<{ data: { success: boolean; status: string }; error: null }>(
+        `/admin/transactions/${r.id}/mark`,
+        { method: "POST", body: JSON.stringify({ status: newStatus }) },
+      );
+      const label = newStatus === "successful" ? "Approved" : newStatus === "failed" ? "Rejected" : "Marked pending";
+      toast.success(`${label}: ${r.full_name}`);
+      qc.invalidateQueries({ queryKey: ["admin-transactions"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update status");
+    } finally {
+      setChangingStatus(null);
+    }
+  };
+
+  // ── Verify via Flutterwave ───────────────────────────────────────────────
   const verify = async (r: Transaction) => {
     if (!r.flw_transaction_id || !r.tx_ref) {
       toast.error("No Flutterwave transaction reference on this record");
@@ -134,9 +160,9 @@ const AdminTransactions = () => {
   };
 
   const badgeFor = (s: string) =>
-    s === "successful" ? "bg-accent text-accent-foreground"
-      : s === "pending" ? "bg-muted text-foreground"
-      : "bg-destructive text-destructive-foreground";
+    s === "successful" ? "bg-green-100 text-green-800 border-green-200"
+      : s === "pending" ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+      : "bg-red-100 text-red-800 border-red-200";
 
   const stats = [
     { label: "All Transactions",    value: totals.count },
@@ -156,7 +182,7 @@ const AdminTransactions = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground mb-1">Transactions</h1>
-              <p className="text-muted-foreground">Flutterwave payment activity across all convention registrations.</p>
+              <p className="text-muted-foreground">View and manage payment status for all convention registrations.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="icon" onClick={() => refetch()} title="Refresh">
@@ -172,7 +198,7 @@ const AdminTransactions = () => {
                   {markingAllPending
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <CheckCircle2 className="w-4 h-4" />}
-                  Mark {totals.pending} Pending as Successful
+                  Approve All Pending ({totals.pending})
                 </Button>
               )}
               <Button onClick={exportCsv} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
@@ -251,33 +277,92 @@ const AdminTransactions = () => {
                         {r.currency || "NGN"} {Number(r.amount).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Badge className={badgeFor(r.payment_status)}>{r.payment_status}</Badge>
+                        <Badge className={`border ${badgeFor(r.payment_status)}`}>
+                          {r.payment_status}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {format(new Date(r.created_at), "MMM d, yyyy HH:mm")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="inline-flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!r.flw_transaction_id || verifying === r.id}
-                            onClick={() => verify(r)}
-                            className="gap-1"
-                          >
-                            {verifying === r.id
-                              ? <Loader2 className="w-3 h-3 animate-spin" />
-                              : <RefreshCw className="w-3 h-3" />}
-                            Verify
-                          </Button>
-                          <Button size="sm" variant="ghost" asChild>
-                            <Link
-                              to={`/admin/convention?ref=${encodeURIComponent(r.reference_code)}`}
-                              className="gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" /> Open
-                            </Link>
-                          </Button>
+                        <div className="inline-flex items-center gap-1">
+                          {/* Quick approve / reject / pending buttons */}
+                          {changingStatus === r.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant={r.payment_status === "successful" ? "default" : "outline"}
+                                className={`h-7 px-2 gap-1 text-xs ${
+                                  r.payment_status === "successful"
+                                    ? "bg-green-600 hover:bg-green-700 text-white"
+                                    : "border-green-300 text-green-700 hover:bg-green-50"
+                                }`}
+                                disabled={r.payment_status === "successful"}
+                                onClick={() => markStatus(r, "successful")}
+                                title="Approve payment"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={r.payment_status === "pending" ? "default" : "outline"}
+                                className={`h-7 px-2 gap-1 text-xs ${
+                                  r.payment_status === "pending"
+                                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                                }`}
+                                disabled={r.payment_status === "pending"}
+                                onClick={() => markStatus(r, "pending")}
+                                title="Set to pending"
+                              >
+                                <Clock className="w-3 h-3" />
+                                Pending
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={r.payment_status === "failed" ? "default" : "outline"}
+                                className={`h-7 px-2 gap-1 text-xs ${
+                                  r.payment_status === "failed"
+                                    ? "bg-red-600 hover:bg-red-700 text-white"
+                                    : "border-red-300 text-red-700 hover:bg-red-50"
+                                }`}
+                                disabled={r.payment_status === "failed"}
+                                onClick={() => markStatus(r, "failed")}
+                                title="Reject payment"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+
+                          {/* More options dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={!r.flw_transaction_id || verifying === r.id}
+                                onClick={() => verify(r)}
+                              >
+                                {verifying === r.id
+                                  ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                  : <RefreshCw className="w-3 h-3 mr-2" />}
+                                Verify via Flutterwave
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link to={`/admin/convention?ref=${encodeURIComponent(r.reference_code)}`}>
+                                  <ExternalLink className="w-3 h-3 mr-2" /> View Registration
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>

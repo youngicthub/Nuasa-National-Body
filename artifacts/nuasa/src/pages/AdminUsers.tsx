@@ -70,12 +70,13 @@ const AdminUsers = () => {
     if (insErr) throw insErr;
   };
 
-  const handleDelete = async (userId: string) => {
-    setDeletingId(userId);
+  // deleteId is the COALESCE(u.id, cr.id) row id — the backend resolves
+  // whether it is a users.id or convention_registrations.id.
+  const handleDelete = async (deleteId: string) => {
+    setDeletingId(deleteId);
     try {
-      // Delete profile, roles, and user record via dedicated admin endpoint
       const token = localStorage.getItem("nuasa_local_access_token");
-      const res = await fetch(`${getApiBase()}/auth/users/${userId}`, {
+      const res = await fetch(`${getApiBase()}/auth/users/${deleteId}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -83,7 +84,7 @@ const AdminUsers = () => {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "Failed to delete user");
       }
-      toast.success("User deleted");
+      toast.success("User permanently deleted");
       qc.invalidateQueries({ queryKey: ["admin-users-list"] });
     } catch (e: any) {
       toast.error(e.message || "Failed to delete user");
@@ -142,7 +143,7 @@ const AdminUsers = () => {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-          {u.user_id && u.user_id !== currentUser?.id && showAdminActions && (
+          {u.user_id && u.user_id !== currentUser?.id && u.id !== currentUser?.id && showAdminActions && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -179,7 +180,7 @@ const AdminUsers = () => {
             </AlertDialog>
           )}
 
-          {u.user_id && u.user_id !== currentUser?.id && !showAdminActions && (
+          {u.user_id && u.user_id !== currentUser?.id && u.id !== currentUser?.id && !showAdminActions && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -216,34 +217,34 @@ const AdminUsers = () => {
             </AlertDialog>
           )}
 
-          {u.user_id && u.user_id !== currentUser?.id && (
+          {u.id !== currentUser?.id && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="ghost" size="sm"
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={deletingId === u.user_id}
+                  disabled={deletingId === u.id}
                 >
-                  {deletingId === u.user_id
+                  {deletingId === u.id
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <Trash2 className="w-4 h-4" />}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+                  <AlertDialogTitle>Permanently delete this user?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes {u.full_name} ({u.email}), their profile and role.
-                    This action cannot be undone.
+                    This permanently removes <strong>{u.full_name}</strong> ({u.email}),
+                    their profile, role, and all associated data. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => handleDelete(u.user_id ?? "")}
+                    onClick={() => handleDelete(u.id)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Delete
+                    Delete Permanently
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

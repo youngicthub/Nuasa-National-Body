@@ -42,8 +42,9 @@ if [ ! -f "$PG_DATADIR/PG_VERSION" ]; then
   echo "[start-api] Init complete"
 fi
 
-# Remove stale socket / lock files
+# Remove stale socket / lock / PID files from a previous run
 rm -f "$PG_RUNDIR"/.s.PGSQL.* 2>/dev/null || true
+rm -f "$PG_DATADIR/postmaster.pid" 2>/dev/null || true
 
 echo "[start-api] Starting PostgreSQL..."
 "$PG_BIN/postgres" \

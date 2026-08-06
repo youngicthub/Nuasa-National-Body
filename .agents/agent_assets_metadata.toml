@@ -11,8 +11,8 @@ title = "NUASA Database Export (MySQL)"
 id = "Lot82zeTf9fVUW37EYQbF"
 uri = "file://nuasa-frontend-dist.zip"
 type = "unspecified"
-title = "NUASA Frontend — Updated Build"
-description = "Updated build with executives page fixed. Upload to your host and set window.__NUASA_API_URL__ in config.js."
+title = "NUASA Frontend — dist (afeeshost deploy)"
+description = "Production build of the NUASA frontend. Unzip and upload the contents of dist/public/ to your afeeshost web root. config.js inside already points to the live Replit API."
 
 [[outputs]]
 id = "wuv3wEcQbksV3vGAxIn8S"
