@@ -165,6 +165,26 @@ router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, nex
 });
 
 /**
+ * POST /api/admin/transactions/mark-pending-successful
+ * Bulk-marks every pending convention registration as successful.
+ * Useful after confirming payments manually.
+ */
+router.post("/admin/transactions/mark-pending-successful", requireAdmin, async (_req, res, next) => {
+  try {
+    await query(
+      "UPDATE convention_registrations SET payment_status = 'successful', updated_at = NOW() WHERE payment_status = 'pending'",
+    );
+    // Count how many are now successful
+    const rows = await query<{ cnt: string }[]>(
+      "SELECT COUNT(*) AS cnt FROM convention_registrations WHERE payment_status = 'successful'",
+    );
+    res.json({ data: { success: true, total_successful: Number(rows[0]?.cnt ?? 0) }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/admin/transactions/:id/mark
  * Manually set payment_status to any valid value (successful / pending / failed).
  */

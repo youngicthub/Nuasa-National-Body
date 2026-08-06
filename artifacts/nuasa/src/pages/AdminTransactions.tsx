@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, ExternalLink, Search, Download } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Search, Download, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -32,7 +32,8 @@ const AdminTransactions = () => {
   const qc = useQueryClient();
   const [search, setSearch]       = useState("");
   const [status, setStatus]       = useState<(typeof STATUS_FILTERS)[number]>("all");
-  const [verifying, setVerifying] = useState<string | null>(null);
+  const [verifying, setVerifying]         = useState<string | null>(null);
+  const [markingAllPending, setMarkingAllPending] = useState(false);
 
   // ── Fetch transactions from local API ───────────────────────────────────
   const { data, isLoading, refetch } = useQuery<Transaction[]>({
@@ -71,7 +72,25 @@ const AdminTransactions = () => {
     };
   }, [data]);
 
-  // ── Verify payment (stub — full Flutterwave verify coming once secret key is saved) ─
+  // ── Mark ALL pending as successful ─────────────────────────────────────
+  const markAllPendingSuccessful = async () => {
+    if (!window.confirm("Mark ALL pending registrations as successful? This cannot be undone.")) return;
+    setMarkingAllPending(true);
+    try {
+      const res = await apiFetch<{ data: { success: boolean; total_successful: number }; error: null }>(
+        "/admin/transactions/mark-pending-successful",
+        { method: "POST" },
+      );
+      toast.success(`Done — ${res.data?.total_successful ?? 0} total successful registrations`);
+      qc.invalidateQueries({ queryKey: ["admin-transactions"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update statuses");
+    } finally {
+      setMarkingAllPending(false);
+    }
+  };
+
+  // ── Verify payment ───────────────────────────────────────────────────────
   const verify = async (r: Transaction) => {
     if (!r.flw_transaction_id || !r.tx_ref) {
       toast.error("No Flutterwave transaction reference on this record");
@@ -143,6 +162,19 @@ const AdminTransactions = () => {
               <Button variant="outline" size="icon" onClick={() => refetch()} title="Refresh">
                 <RefreshCw className="w-4 h-4" />
               </Button>
+              {totals.pending > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={markAllPendingSuccessful}
+                  disabled={markingAllPending}
+                  className="gap-2 border-green-600 text-green-700 hover:bg-green-50"
+                >
+                  {markingAllPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <CheckCircle2 className="w-4 h-4" />}
+                  Mark {totals.pending} Pending as Successful
+                </Button>
+              )}
               <Button onClick={exportCsv} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
                 <Download className="w-4 h-4" /> Export CSV
               </Button>
