@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { PDFViewer } from "@/components/library/PDFViewer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { toast } from "sonner";
 
 const ResourceView = () => {
@@ -30,7 +30,7 @@ const ResourceView = () => {
 
   const recordView = async () => {
     if (!user || !id) return;
-    await supabase.from("resource_views").insert({ user_id: user.id, resource_id: id });
+    await dbClient.from("resource_views").insert({ user_id: user.id, resource_id: id });
     queryClient.invalidateQueries({ queryKey: ["recently-viewed", user.id] });
   };
 
@@ -42,7 +42,7 @@ const ResourceView = () => {
   const { data: resource, isLoading } = useQuery({
     queryKey: ["resource", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("library_resources")
         .select(`
           *,
@@ -53,7 +53,7 @@ const ResourceView = () => {
       if (error) throw error;
       
       // Increment view count
-      await supabase
+      await dbClient
         .from("library_resources")
         .update({ view_count: (data.view_count || 0) + 1 })
         .eq("id", id);
@@ -67,7 +67,7 @@ const ResourceView = () => {
     queryKey: ["saved-resource", id, user?.id],
     queryFn: async () => {
       if (!user) return false;
-      const { data } = await supabase
+      const { data } = await dbClient
         .from("saved_resources")
         .select("id")
         .eq("resource_id", id)
@@ -83,13 +83,13 @@ const ResourceView = () => {
       if (!user || !id) throw new Error("Not authenticated");
       
       if (isSaved) {
-        await supabase
+        await dbClient
           .from("saved_resources")
           .delete()
           .eq("resource_id", id)
           .eq("user_id", user.id);
       } else {
-        await supabase
+        await dbClient
           .from("saved_resources")
           .insert({ resource_id: id, user_id: user.id });
       }
@@ -109,14 +109,14 @@ const ResourceView = () => {
     toast.success("Download started!");
 
     // Fire-and-forget: record the download in the background after the tab opens.
-    supabase
+    dbClient
       .from("library_resources")
       .update({ download_count: (resource.download_count || 0) + 1 })
       .eq("id", id)
       .catch(() => {});
 
     if (user && id) {
-      supabase
+      dbClient
         .from("resource_downloads")
         .insert({ user_id: user.id, resource_id: id })
         .catch(() => {});

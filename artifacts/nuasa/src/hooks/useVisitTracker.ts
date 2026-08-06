@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
+import { getSession } from "@/lib/auth";
 
 const SESSION_KEY = "nuasa_visit_session";
 
@@ -26,9 +27,9 @@ export function useVisitTracker() {
 
     const record = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from("site_visits").insert({
-          user_id: user?.id ?? null,
+        const session = await getSession();
+        await dbClient.from("site_visits").insert({
+          user_id: session?.user?.id ?? null,
           session_id: getSessionId(),
           path: location.pathname,
           referrer: document.referrer || null,

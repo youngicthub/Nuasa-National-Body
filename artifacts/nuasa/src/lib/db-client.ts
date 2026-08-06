@@ -1,26 +1,7 @@
-type LocalUser = {
-  id: string;
-  email?: string;
-  user_metadata?: Record<string, unknown>;
-};
-
-export type Session = { access_token: string; user: LocalUser };
-export type User = LocalUser;
-
 // See src/lib/api.ts for why this is configurable rather than hardcoded.
 import { getApiBase } from "@/lib/api";
 const API_BASE = getApiBase();
 const TOKEN_KEY = "nuasa_local_access_token";
-const listeners = new Set<(event: string, session: Session | null) => void>();
-
-export type ApiError = Error & { code?: string; status?: number };
-
-function authResponseError(message: string, status?: number): ApiError {
-  const error = new Error(message) as ApiError;
-  error.status = status;
-  return error;
-}
-
 async function request(path: string, init?: RequestInit) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = new Headers(init?.headers);
@@ -30,16 +11,10 @@ async function request(path: string, init?: RequestInit) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = payload?.error?.message || payload?.error || `Request failed (${response.status})`;
-    const error: ApiError = new Error(message);
-    error.code = payload?.code;
-    error.status = response.status;
+    const error = new Error(message);
     throw error;
   }
   return payload;
-}
-
-function emit(event: string, session: Session | null) {
-  listeners.forEach((listener) => listener(event, session));
 }
 
 function queryString(filters: Record<string, unknown>) {
@@ -119,95 +94,15 @@ function tableQuery(table: string) {
   return builder;
 }
 
-export const supabase = {
+/**
+ * Database-backed API client.
+ *
+ * Authentication is handled by the Express API's JWT endpoints in
+ * `src/lib/auth.ts`; these methods only provide the existing
+ * data/storage/function transport used by the UI.
+ */
+export const dbClient = {
   from: (table: string) => tableQuery(table),
-  auth: {
-    async signUp({ email, password, options }: {
-      email: string;
-      password: string;
-      options?: { data?: Record<string, unknown>; emailRedirectTo?: string };
-    }) {
-      try {
-        const payload = await request("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, metadata: options?.data }) });
-        if (payload.session?.access_token) {
-          localStorage.setItem(TOKEN_KEY, payload.session.access_token);
-          emit("SIGNED_IN", payload.session);
-        }
-        return { data: payload, error: null };
-      } catch (error) { return { data: { user: null, session: null }, error: error as Error }; }
-    },
-    async signInWithPassword({ email, password }: { email: string; password: string }) {
-      try {
-        const payload = await request("/auth/signin", { method: "POST", body: JSON.stringify({ email, password }) });
-        const accessToken = payload?.session?.access_token;
-        const signedInUser = payload?.session?.user ?? payload?.user;
-
-        // Never dereference a partial response. This can happen when a static
-        // frontend is pointed at the wrong API URL or an API deployment
-        // returns a non-auth payload with a 2xx status.
-        if (typeof accessToken !== "string" || !accessToken || !signedInUser) {
-          return {
-            data: { user: null, session: null },
-            error: authResponseError(
-              "The login service returned an incomplete session. Please check the API URL and try again.",
-            ),
-          };
-        }
-
-        const session: Session = { access_token: accessToken, user: signedInUser };
-        localStorage.setItem(TOKEN_KEY, accessToken);
-        emit("SIGNED_IN", session);
-        return { data: { ...payload, session }, error: null };
-      } catch (error) { return { data: { user: null, session: null }, error: error as Error }; }
-    },
-    async getSession() {
-      try {
-        const payload = await request("/auth/session");
-        const session = payload?.session;
-        if (!session || typeof session.access_token !== "string" || !session.user) {
-          return { data: { session: null }, error: null };
-        }
-        return { data: { session: session as Session }, error: null };
-      } catch { return { data: { session: null }, error: null }; }
-    },
-    async getUser() {
-      const { data } = await this.getSession();
-      return { data: { user: data.session?.user || null }, error: null };
-    },
-    async signOut() {
-      localStorage.removeItem(TOKEN_KEY);
-      emit("SIGNED_OUT", null);
-      return { error: null };
-    },
-    onAuthStateChange(callback: (event: string, session: Session | null) => void) {
-      listeners.add(callback);
-      return { data: { subscription: { unsubscribe: () => listeners.delete(callback) } } };
-    },
-    async updateUser({ password }: { password: string }) {
-      try {
-        await request("/auth/password", { method: "POST", body: JSON.stringify({ password }) });
-        return { error: null };
-      } catch (error) { return { error: error as Error }; }
-    },
-    async resetPasswordForEmail(email: string, _options?: { redirectTo?: string }) {
-      try {
-        await request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email }) });
-        return { error: null };
-      } catch (error) { return { error: error as Error }; }
-    },
-    async verifyEmail(token: string) {
-      try {
-        await request("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) });
-        return { error: null };
-      } catch (error) { return { error: error as Error }; }
-    },
-    async resendVerification(email: string) {
-      try {
-        await request("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) });
-        return { error: null };
-      } catch (error) { return { error: error as Error }; }
-    },
-  },
   storage: {
     from: (bucket: string) => ({
       async upload(_path: string, file: File) {

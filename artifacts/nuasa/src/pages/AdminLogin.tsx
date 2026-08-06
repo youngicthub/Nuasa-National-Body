@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const AdminLogin = () => {
@@ -44,7 +43,7 @@ const AdminLogin = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error, role } = await signIn(email, password);
 
     if (error) {
       toast.error(error.message || "Failed to sign in");
@@ -52,35 +51,12 @@ const AdminLogin = () => {
       return;
     }
 
-    // Verify admin role server-side before redirecting
-    const {
-      data: { user: signedInUser },
-    } = await supabase.auth.getUser();
-    if (signedInUser) {
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", signedInUser.id)
-        .maybeSingle();
-
-      if (roleData?.role !== "admin") {
-        toast.error(
-          "You do not have admin privileges. Use the regular login instead."
-        );
-        await signOut();
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        await supabase.from("admin_login_log").insert({
-          user_id: signedInUser.id,
-          email: signedInUser.email ?? email,
-          user_agent: navigator.userAgent,
-        });
-      } catch {
-        /* ignore */
-      }
+    // The Neon-backed API returns the role in the JWT/session profile.
+    if (role !== "admin") {
+      toast.error("You do not have admin privileges. Use the regular login instead.");
+      await signOut();
+      setIsLoading(false);
+      return;
     }
 
     // Refresh auth context so isAdmin is true before navigating — prevents ProtectedRoute bounce

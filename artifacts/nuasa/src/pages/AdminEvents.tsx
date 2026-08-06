@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { format } from "date-fns";
@@ -31,7 +31,7 @@ const AdminEvents = () => {
   const { data: events, isLoading } = useQuery({
     queryKey: ["admin-events"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("events").select("*").order("start_time", { ascending: false });
       if (error) throw error;
       return data;
@@ -47,7 +47,7 @@ const AdminEvents = () => {
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.from("events").insert({
+    const { error } = await dbClient.from("events").insert({
       title: form.title,
       description: form.description || null,
       location: form.location || null,
@@ -68,7 +68,7 @@ const AdminEvents = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this event?")) return;
-    const { error } = await supabase.from("events").delete().eq("id", id);
+    const { error } = await dbClient.from("events").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Event deleted");
     queryClient.invalidateQueries({ queryKey: ["admin-events"] });
@@ -76,7 +76,7 @@ const AdminEvents = () => {
   };
 
   const handleTogglePublish = async (id: string, current: boolean) => {
-    const { error } = await supabase.from("events").update({ is_published: !current }).eq("id", id);
+    const { error } = await dbClient.from("events").update({ is_published: !current }).eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(!current ? "Event published" : "Event unpublished");
     queryClient.invalidateQueries({ queryKey: ["admin-events"] });

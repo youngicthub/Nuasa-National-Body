@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { apiFetch, getApiBase } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
@@ -64,9 +64,9 @@ const AdminUsers = () => {
   const adminCount = data?.filter((u) => u.role === "admin").length ?? 0;
 
   const setUserRole = async (userId: string, role: "admin" | "user") => {
-    const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", userId);
+    const { error: delErr } = await dbClient.from("user_roles").delete().eq("user_id", userId);
     if (delErr) throw delErr;
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role });
+    const { error: insErr } = await dbClient.from("user_roles").insert({ user_id: userId, role });
     if (insErr) throw insErr;
   };
 

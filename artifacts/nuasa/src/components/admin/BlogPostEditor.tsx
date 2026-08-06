@@ -18,7 +18,7 @@ import {
   Loader2,
   X,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
   const { data: categories } = useQuery({
     queryKey: ["categories-blog"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("categories")
         .select("*")
         .in("type", ["blog", "both"])
@@ -103,7 +103,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
   const { data: tags } = useQuery({
     queryKey: ["tags"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("tags")
         .select("*")
         .order("name");
@@ -172,14 +172,14 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
 
       if (postId) {
         // Update existing post
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("blog_posts")
           .update(postData)
           .eq("id", postId);
         if (error) throw error;
       } else {
         // Create new post
-        const { data, error } = await supabase
+        const { data, error } = await dbClient
           .from("blog_posts")
           .insert(postData)
           .select("id")
@@ -191,7 +191,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
       // Handle tags
       if (postId && selectedTags.length > 0) {
         // Delete existing tags
-        await supabase
+        await dbClient
           .from("blog_post_tags")
           .delete()
           .eq("post_id", postId);
@@ -201,7 +201,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
           post_id: postId,
           tag_id: tagId,
         }));
-        await supabase.from("blog_post_tags").insert(tagInserts);
+        await dbClient.from("blog_post_tags").insert(tagInserts);
       }
 
       toast.success(publish ? "Post published!" : "Post saved as draft");

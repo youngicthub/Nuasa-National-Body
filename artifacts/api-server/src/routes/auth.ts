@@ -31,6 +31,7 @@ function publicUser(row: any) {
       full_name: row.full_name,
       institution: row.institution,
       academic_level: row.academic_level,
+      role: row.role,
     },
   };
 }

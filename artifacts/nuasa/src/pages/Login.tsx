@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { SEO } from "@/components/SEO";
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, user, isAdmin, isLoading: authLoading, refreshProfile } = useAuth();
+  const { signIn, user, isAdmin, isLoading: authLoading, refreshProfile, signOut } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -37,7 +36,7 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error, role } = await signIn(email, password);
 
     if (error) {
       toast.error(error.message || "Failed to sign in");
@@ -45,21 +44,15 @@ const Login = () => {
       return;
     }
 
-    // Block admin accounts from using the user login
-    const { data: { user: signedInUser } } = await supabase.auth.getUser();
-    if (signedInUser) {
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", signedInUser.id)
-        .maybeSingle();
-      if (roleData?.role === "admin") {
-        await supabase.auth.signOut();
-        toast.error("Admin accounts must sign in via the Admin Portal.");
-        setIsLoading(false);
-        navigate("/admin/login", { replace: true });
-        return;
-      }
+    // Block admin accounts from using the user login. The API session already
+    // includes the role, so AuthContext can make this decision without a
+    // second auth provider or direct database auth call.
+    if (role === "admin") {
+      await signOut();
+      toast.error("Admin accounts must sign in via the Admin Portal.");
+      setIsLoading(false);
+      navigate("/admin/login", { replace: true });
+      return;
     }
 
     await refreshProfile();

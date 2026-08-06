@@ -42,7 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -68,7 +68,7 @@ const AdminDashboard = () => {
   const { data: recentResources, isLoading: resourcesLoading } = useQuery({
     queryKey: ["admin-recent-resources"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("library_resources")
         .select("id, title, download_count, view_count, is_public, category:categories(name)")
         .order("created_at", { ascending: false })
@@ -93,7 +93,7 @@ const AdminDashboard = () => {
       const since = new Date();
       since.setDate(since.getDate() - 30);
 
-      const { data: views, error: viewsError } = await supabase
+      const { data: views, error: viewsError } = await dbClient
         .from("resource_views")
         .select("resource_id, viewed_at")
         .gte("viewed_at", since.toISOString());
@@ -102,7 +102,7 @@ const AdminDashboard = () => {
       const counts = new Map<string, { total: number; unique: Set<string>; last: string }>();
       const allViews = views || [];
       // We also need user_id for unique counts — refetch with user_id
-      const { data: viewsWithUser, error: e2 } = await supabase
+      const { data: viewsWithUser, error: e2 } = await dbClient
         .from("resource_views")
         .select("resource_id, user_id, viewed_at")
         .gte("viewed_at", since.toISOString())
@@ -130,7 +130,7 @@ const AdminDashboard = () => {
       if (!ranked.length) return [];
 
       const ids = ranked.map((r) => r.resource_id);
-      const { data: resources, error: rErr } = await supabase
+      const { data: resources, error: rErr } = await dbClient
         .from("library_resources")
         .select("id, title, category:categories(name)")
         .in("id", ids);
@@ -176,7 +176,7 @@ const AdminDashboard = () => {
 
   const handleDeleteResource = async (id: string) => {
     if (!confirm("Delete this resource?")) return;
-    const { error } = await supabase.from("library_resources").delete().eq("id", id);
+    const { error } = await dbClient.from("library_resources").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Resource deleted");
     queryClient.invalidateQueries({ queryKey: ["admin-recent-resources"] });
@@ -184,7 +184,7 @@ const AdminDashboard = () => {
   };
 
   const handleToggleResourceVisibility = async (id: string, currentIsPublic: boolean) => {
-    const { error } = await supabase
+    const { error } = await dbClient
       .from("library_resources")
       .update({ is_public: !currentIsPublic })
       .eq("id", id);

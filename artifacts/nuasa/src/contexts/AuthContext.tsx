@@ -1,5 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Session, User, supabase } from "@/integrations/supabase/client";
+import {
+  getSession,
+  saveSession,
+  Session,
+  signIn as apiSignIn,
+  signOut as clearSession,
+  signUp as apiSignUp,
+  User,
+} from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 type AppRole = "admin" | "user";
 
@@ -20,8 +29,8 @@ interface AuthContextType {
   role: AppRole | null;
   isAdmin: boolean;
   isLoading: boolean;
-  signUp: (email: string, password: string, metadata?: Record<string, unknown>) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, metadata?: Record<string, unknown>) => Promise<{ error: Error | null; role?: AppRole }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; role?: AppRole }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -37,23 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      setProfile(profileData ?? null);
-
-      // Fetch role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      setRole((roleData?.role as AppRole | undefined) ?? null);
+      const response = await apiFetch<{ profile: Profile | null; role: AppRole }>("/auth/me");
+      setProfile(response.profile ?? null);
+      setRole(response.role ?? null);
     } catch (error) {
       console.error("Error fetching user data:", error);
     }
@@ -88,42 +83,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (opts.initial && isMounted) setIsLoading(false);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      void applySession(session, { initial: true });
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      void applySession(nextSession);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    void getSession().then((nextSession) => applySession(nextSession, { initial: true }));
+    return () => { isMounted = false; };
   }, []);
 
   const signUp = async (email: string, password: string, metadata?: Record<string, unknown>) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: metadata,
-      },
-    });
-    return { error: error as Error | null };
+    try {
+      const response = await apiSignUp(email, password, metadata);
+      if (response.session) {
+        saveSession(response.session);
+        setSession(response.session);
+        setUser(response.session.user);
+        await fetchUserData(response.session.user.id);
+      }
+      return { error: null, role: "user" as AppRole };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+    try {
+      const response = await apiSignIn(email, password);
+      if (!response.session) throw new Error("The login service returned an incomplete session.");
+      saveSession(response.session);
+      setSession(response.session);
+      setUser(response.session.user);
+      await fetchUserData(response.session.user.id);
+      return { error: null, role: response.session.user.user_metadata?.role as AppRole | undefined };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    clearSession();
     setSession(null);
     setUser(null);
     setProfile(null);

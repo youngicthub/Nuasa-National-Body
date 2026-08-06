@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { BlogPostEditor } from "@/components/admin/BlogPostEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 
 const AdminPostEditor = () => {
   const { id } = useParams();
@@ -28,7 +28,7 @@ const AdminPostEditor = () => {
     queryKey: ["blog-post", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("blog_posts")
         .select("*")
         .eq("id", id)

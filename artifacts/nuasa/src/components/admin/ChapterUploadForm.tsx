@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Upload, X, Loader2, Check, ImageIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,11 +70,11 @@ export function ChapterUploadForm({ onSuccess }: ChapterUploadFormProps) {
       if (imageFile) {
         const ext = imageFile.name.split(".").pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await dbClient.storage
           .from("chapter-images")
           .upload(fileName, imageFile);
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = dbClient.storage
           .from("chapter-images")
           .getPublicUrl(fileName);
         group_picture_url = urlData.publicUrl;
@@ -82,7 +82,7 @@ export function ChapterUploadForm({ onSuccess }: ChapterUploadFormProps) {
 
       const slug = `${slugify(formData.name)}-${slugify(formData.university)}`;
 
-      const { error: insertError } = await supabase.from("chapters").insert({
+      const { error: insertError } = await dbClient.from("chapters").insert({
         name: formData.name,
         university: formData.university,
         slug,

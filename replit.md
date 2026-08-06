@@ -55,17 +55,12 @@ Used in auth email links (verification, password reset). Override by setting `FR
 
 ## Required secrets
 
-Keep the imported credentials in Replit Secrets; do not commit their values. The local fallback supplies development database defaults when a remote database URL is not configured. Add or retain these in the Secrets panel (padlock icon) when connecting to live data:
+Keep credentials in Replit Secrets; do not commit their values. The live application uses Neon PostgreSQL through `NEON_DATABASE_URL`; the API handles authentication with its own bcrypt password hashes and JWT sessions.
 
 | Secret | Used by | Description |
 |---|---|---|
-| `VITE_SUPABASE_URL` | Frontend | `https://xxxx.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Frontend | Supabase anon key |
-| `DB_HOST` | API Server | PostgreSQL host (default: `127.0.0.1`) |
-| `DB_NAME` | API Server | Database name (default: `nuasa_database`) |
-| `DB_USER` | API Server | Database user (default: `nuasa_user`) |
-| `DB_PASSWORD` | API Server | Database password |
-| `JWT_SECRET` | API Server | Secret for signing JWTs |
+| `NEON_DATABASE_URL` | API Server | Connection string for the live Neon PostgreSQL database |
+| `JWT_SECRET` | API Server | Secret for signing JWT sessions |
 | `SMTP_HOST` | API Server | SMTP server for email |
 | `SMTP_USER` | API Server | SMTP username |
 | `SMTP_PASSWORD` | API Server | SMTP password |

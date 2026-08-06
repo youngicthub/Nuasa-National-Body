@@ -40,7 +40,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
+import { updatePassword } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -84,7 +85,7 @@ const UserDashboard = () => {
     queryKey: ["recently-viewed", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("resource_views")
         .select("id, viewed_at, resource_id, library_resources(id, title, file_type)")
         .eq("user_id", user.id)
@@ -108,7 +109,7 @@ const UserDashboard = () => {
     queryKey: ["recently-read-posts", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("post_views")
         .select("id, viewed_at, post_id, blog_posts(id, title, slug, read_time)")
         .eq("user_id", user.id)
@@ -132,7 +133,7 @@ const UserDashboard = () => {
     queryKey: ["my-downloads", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("resource_downloads")
         .select("id, downloaded_at, resource_id, library_resources(id, title, file_type, file_size, file_url)")
         .eq("user_id", user.id)
@@ -148,7 +149,7 @@ const UserDashboard = () => {
     queryKey: ["my-saved", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("saved_resources")
         .select("id, created_at, resource_id, library_resources(id, title, file_type, category_id, categories:category_id(name))")
         .eq("user_id", user.id)
@@ -167,7 +168,7 @@ const UserDashboard = () => {
     queryKey: ["my-convention-regs", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("convention_registrations")
         .select("*")
         .eq("user_id", user.id)
@@ -215,7 +216,7 @@ const UserDashboard = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message || "Upload failed");
       const publicUrl: string = data.publicUrl || `/api/uploads/${data.path}`;
-      const { error } = await supabase
+      const { error } = await dbClient
         .from("profiles")
         .update({ avatar_url: publicUrl })
         .eq("user_id", user!.id);
@@ -241,8 +242,7 @@ const UserDashboard = () => {
     if (pwForm.newPw !== pwForm.confirmPw) { toast.error("Passwords do not match"); return; }
     setPwLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: pwForm.newPw });
-      if (error) throw error;
+      await updatePassword(pwForm.newPw);
       toast.success("Password updated successfully!");
       setPwForm({ newPw: "", confirmPw: "" });
     } catch (err: any) {
@@ -255,7 +255,7 @@ const UserDashboard = () => {
   const saveProfile = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const { error } = await supabase
+      const { error } = await dbClient
         .from("profiles")
         .update({ full_name: form.full_name, institution: form.institution, academic_level: form.academic_level })
         .eq("user_id", user.id);
@@ -272,7 +272,7 @@ const UserDashboard = () => {
   };
 
   const removeSaved = async (id: string) => {
-    await supabase.from("saved_resources").delete().eq("id", id);
+    await dbClient.from("saved_resources").delete().eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["my-saved", user?.id] });
     toast.success("Removed from saved");
   };

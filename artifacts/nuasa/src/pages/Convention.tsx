@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2, Printer, CheckCircle2, Calendar, MapPin, Users, Download, PartyPopper } from "lucide-react";
@@ -157,7 +157,7 @@ const Convention = () => {
   }, [profile]);
 
   useEffect(() => {
-    supabase.functions.invoke("convention-public-config").then(({ data }) => {
+    dbClient.functions.invoke("convention-public-config").then(({ data }) => {
       if (data?.public_key) setPublicKey(data.public_key);
     });
   }, []);
@@ -166,7 +166,7 @@ const Convention = () => {
     queryKey: ["my-convention-regs", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("convention_registrations")
         .select("*")
         .eq("user_id", user!.id)
@@ -254,7 +254,7 @@ const Convention = () => {
         emergency_contact_name: emergencyName || null,
         emergency_contact_phone: emergencyPhone || null,
       };
-      const { error: insErr } = await supabase.from("convention_registrations").insert(insertPayload);
+      const { error: insErr } = await dbClient.from("convention_registrations").insert(insertPayload);
       if (insErr) throw insErr;
 
       setLocalExtras(prev => ({
@@ -279,7 +279,7 @@ const Convention = () => {
         },
         callback: async (resp: any) => {
           try {
-            const { data } = await supabase.functions.invoke("convention-verify-payment", {
+            const { data } = await dbClient.functions.invoke("convention-verify-payment", {
               body: { transaction_id: resp.transaction_id, tx_ref },
             });
             if (data?.success) {

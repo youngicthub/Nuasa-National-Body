@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChapterUploadForm } from "@/components/admin/ChapterUploadForm";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { toast } from "sonner";
 
 type Chapter = {
@@ -45,7 +45,7 @@ const AdminChapters = () => {
   const { data: chapters, isLoading } = useQuery({
     queryKey: ["admin-chapters"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("chapters")
         .select("*")
         .order("created_at", { ascending: false });
@@ -78,7 +78,7 @@ const AdminChapters = () => {
     if (!editingChapter) return;
     setSaving(true);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await (dbClient as any)
         .from("chapters")
         .update({
           name: editForm.name,
@@ -108,7 +108,7 @@ const AdminChapters = () => {
   const handleDelete = async (id: string, imageUrl: string | null | undefined) => {
     if (!confirm("Delete this chapter? This cannot be undone.")) return;
     try {
-      const { error } = await supabase.from("chapters").delete().eq("id", id);
+      const { error } = await dbClient.from("chapters").delete().eq("id", id);
       if (error) throw error;
       toast.success("Chapter deleted");
       invalidate();

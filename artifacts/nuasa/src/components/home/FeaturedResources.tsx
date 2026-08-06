@@ -4,14 +4,14 @@ import { FileText, Download, Eye, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 
 export const FeaturedResources = () => {
   const { data: resources, isLoading } = useQuery({
     queryKey: ["home-featured-resources"],
     queryFn: async () => {
       // Try featured first, fall back to most recent
-      const { data: featured, error } = await supabase
+      const { data: featured, error } = await dbClient
         .from("library_resources")
         .select(`*, category:categories(name, slug)`)
         .eq("is_featured", true)
@@ -20,7 +20,7 @@ export const FeaturedResources = () => {
       if (error) throw error;
       if (featured && featured.length > 0) return featured;
 
-      const { data: recent } = await supabase
+      const { data: recent } = await dbClient
         .from("library_resources")
         .select(`*, category:categories(name, slug)`)
         .order("created_at", { ascending: false })

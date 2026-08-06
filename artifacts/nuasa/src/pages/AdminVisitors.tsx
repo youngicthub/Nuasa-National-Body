@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -31,7 +31,7 @@ const AdminVisitors = () => {
       const since7 = new Date(); since7.setDate(since7.getDate() - 7);
       const since1 = new Date(); since1.setDate(since1.getDate() - 1);
 
-      const { data: visits, error } = await supabase
+      const { data: visits, error } = await dbClient
         .from("site_visits")
         .select("id, user_id, session_id, path, referrer, user_agent, created_at")
         .gte("created_at", since30.toISOString())
@@ -80,7 +80,7 @@ const AdminVisitors = () => {
 
   const clearMutation = useMutation({
     mutationFn: async () => {
-      let query = supabase.from("site_visits").delete();
+      let query = dbClient.from("site_visits").delete();
       if (clearScope === "all") {
         // Match every row
         query = query.not("id", "is", null);

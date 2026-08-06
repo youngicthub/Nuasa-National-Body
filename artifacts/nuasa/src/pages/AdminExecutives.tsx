@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dbClient } from "@/lib/db-client";
 import { apiFetch, getApiBase } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,7 +121,7 @@ const AdminExecutives = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-executives"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (dbClient as any)
         .from("executives")
         .select("*")
         .order("display_order", { ascending: true });
@@ -187,11 +187,11 @@ const AdminExecutives = () => {
       const dbPayload = toDb({ ...parsed.data, image_url });
 
       if (editing) {
-        const { error } = await (supabase as any).from("executives").update(dbPayload).eq("id", editing.id);
+        const { error } = await (dbClient as any).from("executives").update(dbPayload).eq("id", editing.id);
         if (error) throw error;
         toast.success("Executive updated");
       } else {
-        const { error } = await (supabase as any).from("executives").insert({ id: crypto.randomUUID(), ...dbPayload, created_at: new Date().toISOString() });
+        const { error } = await (dbClient as any).from("executives").insert({ id: crypto.randomUUID(), ...dbPayload, created_at: new Date().toISOString() });
         if (error) throw error;
         toast.success("Executive added");
       }
@@ -208,7 +208,7 @@ const AdminExecutives = () => {
 
   const handleDelete = async (e: Executive) => {
     if (!confirm(`Remove ${e.full_name}?`)) return;
-    const { error } = await (supabase as any).from("executives").delete().eq("id", e.id);
+    const { error } = await (dbClient as any).from("executives").delete().eq("id", e.id);
     if (error) { toast.error(setupMessage(error.message)); return; }
     toast.success("Removed");
     qc.invalidateQueries({ queryKey: ["admin-executives"] });
