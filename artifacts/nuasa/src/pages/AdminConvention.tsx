@@ -17,7 +17,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 
 const TYPE_LABEL: Record<string, string> = { student: "Student", graduate: "Graduate", chapter: "Chapter" };
 
@@ -153,15 +152,6 @@ const AdminConvention = () => {
     URL.revokeObjectURL(url);
   };
 
-  const exportXlsx = (rows: Registration[], name: string) => {
-    const data = buildRows(rows);
-    if (!data.length) { toast.error("Nothing to export"); return; }
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registrations");
-    XLSX.writeFile(wb, `${name}-${Date.now()}.xlsx`);
-  };
-
   const verifyPayment = async (r: Registration) => {
     if (!r.flw_transaction_id || !r.tx_ref) { toast.error("No Flutterwave transaction on this record"); return; }
     setVerifying(r.id);
@@ -229,9 +219,9 @@ const AdminConvention = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => exportCsv(data || [], "all-registrations")}>All — CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportXlsx(data || [], "all-registrations")}>All — Excel</DropdownMenuItem>
+
                 <DropdownMenuItem onClick={() => exportCsv(filtered, "filtered-registrations")}>Filtered — CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportXlsx(filtered, "filtered-registrations")}>Filtered — Excel</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportCsv(filtered, "filtered-registrations")}>Filtered — Excel (CSV)</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
