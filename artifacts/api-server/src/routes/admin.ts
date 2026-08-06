@@ -39,15 +39,14 @@ router.put("/admin/settings/flutterwave", requireAdmin, async (req, res, next) =
       secret_key:     String(secret_key).trim(),
       encryption_key: String(encryption_key).trim(),
     });
-    const userId = req.authUser!.id;
 
     await query(
-      `INSERT INTO app_settings (key, value, updated_by)
-         VALUES ('flutterwave', ?, ?)
+      `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('flutterwave', $1::jsonb, NOW())
        ON CONFLICT (key) DO UPDATE SET
          value      = EXCLUDED.value,
-         updated_by = EXCLUDED.updated_by`,
-      [valueJson, userId],
+         updated_at = EXCLUDED.updated_at`,
+      [valueJson],
     );
 
     res.json({ data: { saved: true }, error: null });

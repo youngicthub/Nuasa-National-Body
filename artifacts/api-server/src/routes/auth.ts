@@ -274,63 +274,104 @@ router.post("/password", optionalAuth, async (req, res, next) => {
   }
 });
 
-// ─── Forgot / reset password ──────────────────────────────────────────────────
+// ─── Forgot / reset password (OTP-based) ─────────────────────────────────────
 
+/**
+ * Step 1: POST { email }
+ *   → Generates a 6-digit OTP, stores its hash in auth_tokens, returns the
+ *     OTP directly so the frontend can display it to the user on-screen.
+ *
+ * Step 2: POST { email, otp, password }
+ *   → Validates the OTP for that user, hashes and saves the new password,
+ *     marks the token used.
+ */
 router.post("/reset-password", looseLimiter, async (req, res, next) => {
   try {
-    const { email, token, password } = req.body ?? {};
+    const { email, otp, password } = req.body ?? {};
 
-    if (token && password) {
+    // ── Step 2: verify OTP and set new password ───────────────────────────
+    if (email && otp && password) {
       if (typeof password !== "string" || password.length < 8) {
         res.status(400).json({ error: "Password must be at least 8 characters" });
         return;
       }
-      const tokenHash = crypto.createHash("sha256").update(String(token)).digest("hex");
-      const tokenRows = await query<any[]>(
-        "SELECT id, user_id FROM auth_tokens WHERE token_hash = ? AND token_type = 'password_reset' AND expires_at > CURRENT_TIMESTAMP AND used_at IS NULL LIMIT 1",
-        [tokenHash],
+
+      const normalEmail = String(email).toLowerCase().trim();
+      const users = await query<any[]>(
+        "SELECT id FROM users WHERE email = ? LIMIT 1",
+        [normalEmail],
       );
-      if (!tokenRows[0]) {
-        res.status(400).json({ error: "Reset link is invalid or expired" });
+      if (!users[0]) {
+        res.status(400).json({ error: "Invalid or expired code" });
         return;
       }
+
+      const otpHash = crypto.createHash("sha256").update(String(otp).trim()).digest("hex");
+      const tokenRows = await query<any[]>(
+        `SELECT id FROM auth_tokens
+         WHERE user_id = ? AND token_hash = ? AND token_type = 'password_reset'
+           AND expires_at > CURRENT_TIMESTAMP AND used_at IS NULL
+         LIMIT 1`,
+        [users[0].id, otpHash],
+      );
+      if (!tokenRows[0]) {
+        res.status(400).json({ error: "Invalid or expired code" });
+        return;
+      }
+
       const hash = await bcrypt.hash(password, 12);
-      await query("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [hash, tokenRows[0].user_id]);
-      await query("UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?", [tokenRows[0].id]);
+      await query(
+        "UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [hash, users[0].id],
+      );
+      await query(
+        "UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [tokenRows[0].id],
+      );
       res.json({ success: true });
       return;
     }
 
+    // ── Step 1: generate and return OTP ──────────────────────────────────
     if (!email) {
       res.status(400).json({ error: "Email is required" });
       return;
     }
-    const users = await query<any[]>("SELECT id FROM users WHERE email = ? LIMIT 1", [String(email).toLowerCase()]);
-    if (users[0]) {
-      const rawToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-      await query(
-        "UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND token_type = 'password_reset' AND used_at IS NULL",
-        [users[0].id],
-      );
-      await query(
-        "INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at) VALUES (?, ?, ?, 'password_reset', NOW() + INTERVAL '60 minutes', CURRENT_TIMESTAMP)",
-        [crypto.randomUUID(), users[0].id, tokenHash],
-      );
-      const origin = process.env.FRONTEND_URL || process.env.APP_ORIGIN || "http://localhost";
-      const link = `${origin}/reset-password?token=${rawToken}`;
-      if (process.env.SMTP_HOST) {
-        await sendMail(
-          String(email),
-          "NUASA password reset",
-          `Reset your password:\n\n${link}\n\nThis link expires in 60 minutes.`,
-          `<p>Reset your NUASA password: <a href="${link}">Reset Password</a></p><p>This link expires in 60 minutes.</p>`,
-        );
-      } else {
-        console.info("[auth] Password reset token (no SMTP):", rawToken);
-      }
+
+    const normalEmail = String(email).toLowerCase().trim();
+    const users = await query<any[]>(
+      "SELECT id FROM users WHERE email = ? LIMIT 1",
+      [normalEmail],
+    );
+
+    if (!users[0]) {
+      // Don't reveal whether the email exists — but we need to return an OTP
+      // only for real users. Return a generic success with no otp field.
+      res.json({ success: true });
+      return;
     }
-    res.json({ success: true });
+
+    // Generate a 6-digit numeric OTP
+    const rawOtp = String(Math.floor(100000 + Math.random() * 900000));
+    const otpHash = crypto.createHash("sha256").update(rawOtp).digest("hex");
+
+    // Invalidate any prior unused reset tokens for this user
+    await query(
+      "UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND token_type = 'password_reset' AND used_at IS NULL",
+      [users[0].id],
+    );
+
+    // Store hashed OTP — expires in 15 minutes
+    await query(
+      `INSERT INTO auth_tokens (id, user_id, token_hash, token_type, expires_at, created_at)
+       VALUES (?, ?, ?, 'password_reset', NOW() + INTERVAL '15 minutes', CURRENT_TIMESTAMP)`,
+      [crypto.randomUUID(), users[0].id, otpHash],
+    );
+
+    console.info("[auth] Password reset OTP generated for:", normalEmail);
+
+    // Return the OTP directly so the frontend can display it on-screen
+    res.json({ success: true, otp: rawOtp });
   } catch (err) {
     next(err);
   }
