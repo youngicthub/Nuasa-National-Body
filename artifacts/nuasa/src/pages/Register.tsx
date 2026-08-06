@@ -71,7 +71,7 @@ const Register = () => {
       return;
     }
 
-    toast.success("Account created! Check your email to verify your address.");
+    toast.success("Account created! Welcome to NUASA.");
     navigate("/dashboard");
   };
 

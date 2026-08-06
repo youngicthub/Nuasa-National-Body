@@ -47,23 +47,7 @@ const AdminLogin = () => {
     const { error } = await signIn(email, password);
 
     if (error) {
-      if ((error as { code?: string }).code === "EMAIL_NOT_VERIFIED") {
-        toast.error(error.message, {
-          action: {
-            label: "Resend email",
-            onClick: async () => {
-              const { error: resendError } = await supabase.auth.resendVerification(email);
-              if (resendError) {
-                toast.error(resendError.message || "Failed to resend verification email");
-              } else {
-                toast.success("Verification email sent — check your inbox.");
-              }
-            },
-          },
-        });
-      } else {
-        toast.error(error.message || "Failed to sign in");
-      }
+      toast.error(error.message || "Failed to sign in");
       setIsLoading(false);
       return;
     }
