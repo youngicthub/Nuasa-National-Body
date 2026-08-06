@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getApiBase } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -75,7 +75,7 @@ const AdminUsers = () => {
     try {
       // Delete profile, roles, and user record via dedicated admin endpoint
       const token = localStorage.getItem("nuasa_local_access_token");
-      const res = await fetch(`/api/auth/users/${userId}`, {
+      const res = await fetch(`${getApiBase()}/auth/users/${userId}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
