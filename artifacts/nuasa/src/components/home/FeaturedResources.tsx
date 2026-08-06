@@ -57,7 +57,7 @@ export const FeaturedResources = () => {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {resources.map((resource, index) => (
+            {resources.map((resource: any, index: number) => (
               <motion.div
                 key={resource.id}
                 initial={{ opacity: 0, y: 20 }}

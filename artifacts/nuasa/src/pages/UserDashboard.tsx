@@ -439,7 +439,7 @@ const UserDashboard = () => {
                       </div>
                     ) : (
                       <div className="divide-y divide-border">
-                        {recentlyViewed.slice(0, 5).map((item) => {
+                        {recentlyViewed.slice(0, 5).map((item: any) => {
                           const resource = item.library_resources;
                           if (!resource) return null;
                           return (
@@ -482,7 +482,7 @@ const UserDashboard = () => {
                       </div>
                     ) : (
                       <div className="divide-y divide-border">
-                        {recentlyRead.map((item) => {
+                        {recentlyRead.map((item: any) => {
                           const post = item.blog_posts;
                           if (!post) return null;
                           return (
@@ -528,7 +528,7 @@ const UserDashboard = () => {
                       </div>
                     ) : (
                       <div className="divide-y divide-border">
-                        {downloads.map((item) => {
+                        {downloads.map((item: any) => {
                           const r = item.library_resources;
                           if (!r) return null;
                           return (
@@ -576,7 +576,7 @@ const UserDashboard = () => {
                       </div>
                     ) : (
                       <div className="divide-y divide-border">
-                        {saved.map((item) => {
+                        {saved.map((item: any) => {
                           const r = item.library_resources;
                           if (!r) return null;
                           const cat = (r as { categories?: { name?: string } }).categories;

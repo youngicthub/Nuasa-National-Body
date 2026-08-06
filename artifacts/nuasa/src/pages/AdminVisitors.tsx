@@ -39,21 +39,21 @@ const AdminVisitors = () => {
         .limit(2000);
       if (error) throw error;
 
-      const all = visits || [];
-      const sessions = new Set(all.map(v => v.session_id));
-      const last7 = all.filter(v => new Date(v.created_at) >= since7);
-      const last1 = all.filter(v => new Date(v.created_at) >= since1);
-      const sessions7 = new Set(last7.map(v => v.session_id));
-      const sessions1 = new Set(last1.map(v => v.session_id));
+      const all: any[] = visits || [];
+      const sessions = new Set(all.map((v: any) => v.session_id));
+      const last7 = all.filter((v: any) => new Date(v.created_at) >= since7);
+      const last1 = all.filter((v: any) => new Date(v.created_at) >= since1);
+      const sessions7 = new Set(last7.map((v: any) => v.session_id));
+      const sessions1 = new Set(last1.map((v: any) => v.session_id));
 
       const pathCounts = new Map<string, number>();
-      all.forEach(v => pathCounts.set(v.path, (pathCounts.get(v.path) || 0) + 1));
+      all.forEach((v: any) => pathCounts.set(v.path, (pathCounts.get(v.path) || 0) + 1));
       const topPages = [...pathCounts.entries()]
         .sort((a,b) => b[1]-a[1]).slice(0,8)
         .map(([path, count]) => ({ path, count }));
 
       const refCounts = new Map<string, number>();
-      all.forEach(v => {
+      all.forEach((v: any) => {
         if (!v.referrer) return;
         try {
           const host = new URL(v.referrer).hostname;
@@ -221,7 +221,7 @@ const AdminVisitors = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data?.recent.map((v) => (
+                    {data?.recent.map((v: any) => (
                       <TableRow key={v.id}>
                         <TableCell className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}

@@ -109,7 +109,7 @@ const AdminDashboard = () => {
         .order("viewed_at", { ascending: false });
       if (e2) throw e2;
 
-      (viewsWithUser || []).forEach((v) => {
+      (viewsWithUser || []).forEach((v: any) => {
         const entry = counts.get(v.resource_id) || { total: 0, unique: new Set<string>(), last: v.viewed_at };
         entry.total += 1;
         entry.unique.add(v.user_id);
@@ -136,13 +136,13 @@ const AdminDashboard = () => {
         .in("id", ids);
       if (rErr) throw rErr;
 
-      const byId = new Map((resources || []).map((r) => [r.id, r]));
+      const byId = new Map((resources || []).map((r: any) => [r.id, r]));
       const maxTotal = ranked[0]?.total || 1;
 
       return ranked.map((r) => ({
         ...r,
-        title: byId.get(r.resource_id)?.title || "Untitled resource",
-        category: byId.get(r.resource_id)?.category?.name || "Uncategorized",
+        title: (byId.get(r.resource_id) as any)?.title || "Untitled resource",
+        category: (byId.get(r.resource_id) as any)?.category?.name || "Uncategorized",
         percent: Math.round((r.total / maxTotal) * 100),
       }));
     },
@@ -177,7 +177,7 @@ const AdminDashboard = () => {
   const handleDeleteResource = async (id: string) => {
     if (!confirm("Delete this resource?")) return;
     const { error } = await supabase.from("library_resources").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Resource deleted");
     queryClient.invalidateQueries({ queryKey: ["admin-recent-resources"] });
     queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -188,7 +188,7 @@ const AdminDashboard = () => {
       .from("library_resources")
       .update({ is_public: !currentIsPublic })
       .eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(!currentIsPublic ? "Resource published — visible to everyone" : "Resource unpublished — hidden from public");
     queryClient.invalidateQueries({ queryKey: ["admin-recent-resources"] });
   };
@@ -362,7 +362,7 @@ const AdminDashboard = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {recentResources.map((resource) => (
+                        {recentResources.map((resource: any) => (
                           <TableRow key={resource.id}>
                             <TableCell className="font-medium">
                               <Link to={`/library/${resource.id}`} className="hover:text-accent">

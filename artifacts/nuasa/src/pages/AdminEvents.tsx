@@ -59,7 +59,7 @@ const AdminEvents = () => {
       created_by: user?.id,
     });
     setSubmitting(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Event created");
     setForm({ title: "", description: "", location: "", cover_image: "", link: "", start_time: "", end_time: "", is_published: true });
     queryClient.invalidateQueries({ queryKey: ["admin-events"] });
@@ -69,7 +69,7 @@ const AdminEvents = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this event?")) return;
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Event deleted");
     queryClient.invalidateQueries({ queryKey: ["admin-events"] });
     queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -77,7 +77,7 @@ const AdminEvents = () => {
 
   const handleTogglePublish = async (id: string, current: boolean) => {
     const { error } = await supabase.from("events").update({ is_published: !current }).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(!current ? "Event published" : "Event unpublished");
     queryClient.invalidateQueries({ queryKey: ["admin-events"] });
   };
@@ -157,7 +157,7 @@ const AdminEvents = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {events.map((ev) => {
+                      {events.map((ev: any) => {
                         const isPast = new Date(ev.end_time || ev.start_time) < new Date();
                         return (
                           <div key={ev.id} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-accent transition-colors">

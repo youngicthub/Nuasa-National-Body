@@ -102,6 +102,14 @@ if [ ! -f "$SETUP_MARKER" ]; then
     echo "[start-api] Schema imported successfully"
   fi
 
+  # Grant the app user full access to all tables/sequences created by runner
+  "$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U runner -d "$_DB_NAME" \
+    -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"${_DB_USER}\"; \
+        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"${_DB_USER}\"; \
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"${_DB_USER}\"; \
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"${_DB_USER}\";" 2>&1
+  echo "[start-api] Permissions granted to ${_DB_USER}"
+
   touch "$SETUP_MARKER"
   echo "[start-api] DB setup complete"
 fi

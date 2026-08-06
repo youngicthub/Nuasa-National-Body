@@ -403,7 +403,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {categories?.map((cat) => (
+              {categories?.map((cat: any) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
                 </SelectItem>
@@ -416,7 +416,7 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
         <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
           <h3 className="font-semibold text-foreground">Tags</h3>
           <div className="flex flex-wrap gap-2">
-            {tags?.map((tag) => (
+            {tags?.map((tag: any) => (
               <Badge
                 key={tag.id}
                 variant={selectedTags.includes(tag.id) ? "default" : "outline"}

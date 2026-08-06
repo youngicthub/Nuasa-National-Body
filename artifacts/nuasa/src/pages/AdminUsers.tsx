@@ -169,7 +169,7 @@ const AdminUsers = () => {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => handlePromoteToAdmin(u.user_id, u.full_name || "")}
+                    onClick={() => handlePromoteToAdmin(u.user_id ?? "", u.full_name || "")}
                     className="bg-green-600 text-white hover:bg-green-700"
                   >
                     Grant Admin Access
@@ -206,7 +206,7 @@ const AdminUsers = () => {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => handleRevokeAdmin(u.user_id, u.full_name || "")}
+                    onClick={() => handleRevokeAdmin(u.user_id ?? "", u.full_name || "")}
                     className="bg-orange-600 text-white hover:bg-orange-700"
                   >
                     Revoke Access
@@ -240,7 +240,7 @@ const AdminUsers = () => {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => handleDelete(u.user_id)}
+                    onClick={() => handleDelete(u.user_id ?? "")}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Delete

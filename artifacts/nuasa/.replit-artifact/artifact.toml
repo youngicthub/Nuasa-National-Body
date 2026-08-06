@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "NUASA"
+title = "NUASA E-Library"
 description = "NUASA National Body E-Library & Blog — a full-stack platform for Nigerian accounting students with resources, blog posts, convention registration, and chapter management."
 version = "1.0.0"
 id = "artifacts/nuasa"

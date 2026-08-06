@@ -260,7 +260,7 @@ const Convention = () => {
       setLocalExtras(prev => ({
         ...prev,
         [tx_ref]: {
-          delegates: chapterDelegates,
+          delegates: chapterDelegates ?? [],
           breakoutSession: type === "student" ? breakoutSession : null,
         },
       }));
@@ -530,7 +530,7 @@ const Convention = () => {
           <h2 className="font-serif text-2xl font-bold mb-1">Register</h2>
           <p className="text-sm text-muted-foreground mb-6">Choose your registration type and complete payment via Flutterwave.</p>
 
-          {registrations?.some((r) => r.payment_status === "successful") ? (
+          {registrations?.some((r: any) => r.payment_status === "successful") ? (
             <div className="flex flex-col items-center justify-center py-14 gap-5 text-center">
               <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8 text-accent" />
@@ -715,7 +715,7 @@ const Convention = () => {
             <p className="text-sm text-muted-foreground">No registrations yet.</p>
           ) : (
             <div className="space-y-4">
-              {registrations.map((r) => (
+              {registrations.map((r: any) => (
                 <Card key={r.id} className="p-4">
                   <div id={`ticket-${r.id}`}>
                     <div className="ticket">

@@ -166,8 +166,8 @@ const AdminSettings = () => {
 
   // ── Change password ───────────────────────────────────────────────────────
   const updatePassword = async () => {
-    if (newPassword.length < 8) return toast.error("Password must be at least 8 characters");
-    if (newPassword !== confirmPassword) return toast.error("Passwords do not match");
+    if (newPassword.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    if (newPassword !== confirmPassword) { toast.error("Passwords do not match"); return; }
     setSavingPassword(true);
     try {
       await apiFetch("/auth/password", {

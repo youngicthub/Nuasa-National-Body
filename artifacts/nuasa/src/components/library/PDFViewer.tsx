@@ -30,6 +30,7 @@ export function PDFViewer({ url, title, isOpen, onClose, onDownload }: PDFViewer
       const t = window.setTimeout(() => setIsLoading(false), 4000);
       return () => window.clearTimeout(t);
     }
+    return undefined;
   }, [isOpen, url]);
 
   const isPdf = /\.pdf($|\?)/i.test(url);
