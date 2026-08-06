@@ -1,5 +1,8 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# Migration backup — kept locally but not tracked in git
+.migration-backup/
+
 # compiled output
 dist
 tmp
