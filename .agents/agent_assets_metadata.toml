@@ -55,3 +55,10 @@ uri = "file://nuasa-frontend-afeeshost.zip"
 type = "unspecified"
 title = "NUASA Frontend — AfeeHost Deploy Package"
 description = "Production-built static frontend. Extract to your web root on AfeeHost. The included config.js already points to the live Replit API at https://nuasa-national-body--dopedylan656.replit.app/api"
+
+[[outputs]]
+id = "Pn4Mtn8MO_0DjxWYMFwzY"
+uri = "file://nuasa-frontend.zip"
+type = "unspecified"
+title = "nuasa-frontend.zip"
+description = "Built frontend dist — extract and upload the contents of the public/ folder to your public_html on AfeeHost."
