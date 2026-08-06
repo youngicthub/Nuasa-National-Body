@@ -36,8 +36,10 @@ app.use(
 // wide-open CORS to make worse. `credentials: false` keeps that true even
 // if a cookie-based flow gets added later without revisiting this line.
 app.use(cors({ origin: "*", credentials: false }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Raise body limit to 20 MB to accommodate base64-encoded images that admins
+// may embed directly in API payloads (executive photos, etc.).
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 // Every real route lives under /api (see routes/index.ts) — this is just so
 // hitting the bare domain root (e.g. sanity-checking a fresh deploy) shows

@@ -139,6 +139,17 @@ const BlogPost = () => {
         </div>
       </section>
 
+      {/* Cover image */}
+      {post.image_url && (
+        <div className="w-full max-h-[480px] overflow-hidden bg-muted">
+          <img
+            src={post.image_url}
+            alt={post.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+
       {/* Content */}
       <section className="section-padding bg-background">
         <div className="content-container">

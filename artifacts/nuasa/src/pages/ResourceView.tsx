@@ -100,24 +100,28 @@ const ResourceView = () => {
     },
   });
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (!resource) return;
-    
-    // Increment download count
-    await supabase
-      .from("library_resources")
-      .update({ download_count: (resource.download_count || 0) + 1 })
-      .eq("id", id);
 
-    // Record per-user download history
-    if (user && id) {
-      await supabase.from("resource_downloads").insert({ user_id: user.id, resource_id: id });
-      queryClient.invalidateQueries({ queryKey: ["my-downloads", user.id] });
-    }
-    
-    // Open file in new tab for download
+    // Open the file immediately — must be synchronous (no await before this)
+    // so the browser doesn't treat it as an unsolicited popup.
     window.open(resource.file_url, "_blank");
     toast.success("Download started!");
+
+    // Fire-and-forget: record the download in the background after the tab opens.
+    supabase
+      .from("library_resources")
+      .update({ download_count: (resource.download_count || 0) + 1 })
+      .eq("id", id)
+      .catch(() => {});
+
+    if (user && id) {
+      supabase
+        .from("resource_downloads")
+        .insert({ user_id: user.id, resource_id: id })
+        .catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ["my-downloads", user.id] });
+    }
   };
 
   if (isLoading) {

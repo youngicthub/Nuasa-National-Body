@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getApiBase } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,40 +82,15 @@ const setupMessage = (message: string) => {
   return message;
 };
 
-/** Resize + compress an image File to a JPEG data URL (max 500×600px, 80% quality). */
-async function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Failed to load image"));
-      img.onload = () => {
-        const MAX_W = 500, MAX_H = 600;
-        let { width, height } = img;
-        if (width > MAX_W || height > MAX_H) {
-          const ratio = Math.min(MAX_W / width, MAX_H / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = ev.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 const AdminExecutives = () => {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Executive | null>(null);
   const [form, setForm] = useState<Omit<Executive, "id">>(blank);
-  const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
+  /** Local object URL for previewing a newly selected photo (not stored in DB). */
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  /** The actual File chosen by admin — uploaded to the API on save. */
+  const photoFileRef = useRef<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   // DB uses: name, display_order, is_current — app UI uses: full_name, sort_order, is_active
@@ -155,10 +130,16 @@ const AdminExecutives = () => {
     },
   });
 
+  const clearPhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(null);
+    photoFileRef.current = null;
+  };
+
   const openNew = () => {
     setEditing(null);
     setForm(blank);
-    setFileDataUrl(null);
+    clearPhoto();
     setOpen(true);
   };
 
@@ -174,7 +155,7 @@ const AdminExecutives = () => {
       sort_order: e.sort_order,
       is_active: e.is_active,
     });
-    setFileDataUrl(null);
+    clearPhoto();
     setOpen(true);
   };
 
@@ -186,8 +167,22 @@ const AdminExecutives = () => {
     }
     setSaving(true);
     try {
-      // Use the compressed data URL if admin picked a new photo, otherwise keep existing URL
-      const image_url = fileDataUrl ?? parsed.data.image_url;
+      // If admin picked a new photo file, upload it to the API and use the returned URL.
+      // This avoids embedding large base64 strings in the JSON body.
+      let image_url = parsed.data.image_url;
+      if (photoFileRef.current) {
+        const fd = new FormData();
+        fd.append("file", photoFileRef.current);
+        const token = localStorage.getItem("nuasa_local_access_token");
+        const res = await fetch(`${getApiBase()}/uploads`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd,
+        });
+        if (!res.ok) throw new Error("Photo upload failed");
+        const { publicUrl } = await res.json();
+        image_url = publicUrl as string;
+      }
 
       const dbPayload = toDb({ ...parsed.data, image_url });
 
@@ -297,21 +292,18 @@ const AdminExecutives = () => {
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (!f) { setFileDataUrl(null); return; }
-                      try {
-                        const dataUrl = await compressImage(f);
-                        setFileDataUrl(dataUrl);
-                      } catch {
-                        toast.error("Could not process image. Try a different file.");
-                        setFileDataUrl(null);
-                      }
+                      if (!f) { clearPhoto(); return; }
+                      // Store the File for upload on save; show a local preview immediately.
+                      if (photoPreview) URL.revokeObjectURL(photoPreview);
+                      photoFileRef.current = f;
+                      setPhotoPreview(URL.createObjectURL(f));
                     }}
                   />
-                  {(fileDataUrl || form.image_url) && (
+                  {(photoPreview || form.image_url) && (
                     <img
-                      src={fileDataUrl || form.image_url || ""}
+                      src={photoPreview || form.image_url || ""}
                       alt="Preview"
                       className="mt-2 w-24 h-24 object-cover rounded border"
                     />
