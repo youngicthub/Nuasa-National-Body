@@ -59,7 +59,7 @@ Keep credentials in Replit Secrets; do not commit their values. The live applica
 
 | Secret | Used by | Description |
 |---|---|---|
-| `NEON_DATABASE_URL` | API Server | Connection string for the live Neon PostgreSQL database |
+| `DATABASE_URL` or `NEON_DATABASE_URL` | API Server | Connection string for the live Neon PostgreSQL database |
 | `JWT_SECRET` | API Server | Secret for signing JWT sessions |
 | `SMTP_HOST` | API Server | SMTP server for email |
 | `SMTP_USER` | API Server | SMTP username |

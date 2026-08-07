@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 // Strip channel_binding which node-postgres doesn't support
-const connStr = (process.env.NEON_DATABASE_URL || "").replace(/[?&]channel_binding=[^&]*/g, (m) =>
+const connStr = (process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "").replace(/[?&]channel_binding=[^&]*/g, (m) =>
   m.startsWith("?") ? "?" : ""
 );
 
