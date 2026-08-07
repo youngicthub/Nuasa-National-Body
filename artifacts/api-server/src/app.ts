@@ -50,4 +50,12 @@ app.get("/", (_req, res) => {
 
 app.use("/api", router);
 
+// Keep API failures machine-readable for the separately hosted AfeeHost
+// frontend. Do not expose database or credential details to browsers.
+app.use((err: unknown, req: any, res: any, _next: any) => {
+  req.log?.error({ err }, "request failed");
+  if (res.headersSent) return;
+  res.status(500).json({ error: "Internal server error" });
+});
+
 export default app;
