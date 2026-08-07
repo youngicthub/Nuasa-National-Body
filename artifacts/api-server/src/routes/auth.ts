@@ -70,11 +70,12 @@ async function issueVerificationToken(userId: string): Promise<string> {
 router.post("/signup", looseLimiter, async (req, res, next) => {
   try {
     const { email, password, metadata = {} } = req.body ?? {};
+    const normalizedEmail = String(email || "").trim().toLowerCase();
     if (!email || !password || password.length < 6) {
       res.status(400).json({ error: "Email and a password of at least 6 characters are required" });
       return;
     }
-    const existing = await query<any[]>("SELECT id FROM users WHERE email = ? LIMIT 1", [email.toLowerCase()]);
+    const existing = await query<any[]>("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
     if (existing.length) {
       res.status(409).json({ error: "User already registered" });
       return;
@@ -84,18 +85,18 @@ router.post("/signup", looseLimiter, async (req, res, next) => {
     // email_verified=true — no verification step required; all accounts can log in immediately.
     await query(
       "INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-      [id, email.toLowerCase(), passwordHash],
+      [id, normalizedEmail, passwordHash],
     );
     await query(
       "INSERT INTO profiles (id, user_id, full_name, email, institution, academic_level, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-      [crypto.randomUUID(), id, metadata.full_name || "User", email.toLowerCase(), metadata.institution || null, metadata.academic_level || null],
+      [crypto.randomUUID(), id, metadata.full_name || "User", normalizedEmail, metadata.institution || null, metadata.academic_level || null],
     );
     await query(
       "INSERT INTO user_roles (id, user_id, role, created_at) VALUES (?, ?, 'user', CURRENT_TIMESTAMP)",
       [crypto.randomUUID(), id],
     );
 
-    const user = { id, email: email.toLowerCase(), role: "user" as const, full_name: metadata.full_name || "User" };
+    const user = { id, email: normalizedEmail, role: "user" as const, full_name: metadata.full_name || "User" };
     res.status(201).json({
       user: publicUser({ ...user, ...metadata }),
       session: {
@@ -171,6 +172,7 @@ router.post("/admin-signup", strictLimiter, async (req, res, next) => {
 router.post("/signin", strictLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body ?? {};
+    const normalizedEmail = String(email || "").trim().toLowerCase();
     const rows = await query<any[]>(
       `SELECT u.*, COALESCE(p.full_name, 'User') AS full_name, p.institution, p.academic_level,
               COALESCE(ur.role, 'user') AS role
@@ -178,7 +180,7 @@ router.post("/signin", strictLimiter, async (req, res, next) => {
        LEFT JOIN profiles p ON p.user_id = u.id
        LEFT JOIN user_roles ur ON ur.user_id = u.id
        WHERE u.email = ? LIMIT 1`,
-      [String(email || "").toLowerCase()],
+      [normalizedEmail],
     );
     const row = rows[0];
     if (!row || !(await bcrypt.compare(password || "", row.password_hash))) {

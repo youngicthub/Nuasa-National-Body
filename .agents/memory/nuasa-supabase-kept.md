@@ -13,6 +13,8 @@ The API uses pg for local development and Neon for production.
 - Schema is applied to Neon (all tables exist; some older index columns differ from schema file — harmless)
 - The dev workflow uses local PostgreSQL via `scripts/start-api.sh` when
   `NEON_DATABASE_URL` is not available; production uses Neon directly.
+- Replit's runtime `DATABASE_URL` may point to an unrelated `heliumdb`; do not
+  treat its presence as proof that the NUASA Neon database is connected.
 
 **Why:** Autoscale deployment can't run local PostgreSQL; Neon is the production
 DB, while the local fallback keeps the Replit preview self-contained.
