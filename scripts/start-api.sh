@@ -29,7 +29,7 @@ if [ -n "$REMOTE_DATABASE_URL" ]; then
 fi
 
 # ── Local PostgreSQL (dev fallback) ───────────────────────────────────────────
-PG_BIN="/nix/store/p1bjsswnxgb73742slz0w2h0049nydk2-replit-runtime-path/bin"
+PG_BIN="/nix/store/ilv22ggshndixprdfpi4h1cdwq8qagmi-replit-runtime-path/bin"
 PG_DATADIR="/home/runner/.pg-data"
 PG_RUNDIR="/home/runner/.pg-run"
 PG_PORT=5432
