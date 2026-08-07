@@ -19,6 +19,11 @@ export const pool = new Pool({
   max: Number(process.env.DB_CONNECTION_LIMIT || 10),
 });
 
+function toPostgresPlaceholders(sql: string) {
+  let idx = 0;
+  return sql.replace(/\?/g, () => `$${++idx}`);
+}
+
 /**
  * Run a SQL query against the PostgreSQL database.
  * Converts MySQL-style `?` placeholders to PostgreSQL `$1, $2, ...` automatically.
@@ -27,11 +32,36 @@ export async function query<T = unknown[]>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T> {
-  // Convert MySQL-style ? to PostgreSQL $1, $2, ...
-  let idx = 0;
-  const pgSql = sql.replace(/\?/g, () => `$${++idx}`);
-  const result = await pool.query(pgSql, params);
+  const result = await pool.query(toPostgresPlaceholders(sql), params);
   return result.rows as T;
+}
+
+/**
+ * Run several statements as one all-or-nothing operation.
+ * The callback receives a checked-out client and uses the same `?` placeholder
+ * convention as `query`, so route code cannot accidentally escape the transaction.
+ */
+export async function withTransaction<T>(
+  callback: (tx: { query: <R = unknown[]>(sql: string, params?: unknown[]) => Promise<R> }) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  const tx = {
+    query: async <R = unknown[]>(sql: string, params: unknown[] = []) => {
+      const result = await client.query(toPostgresPlaceholders(sql), params);
+      return result.rows as R;
+    },
+  };
+  try {
+    await client.query("BEGIN");
+    const result = await callback(tx);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function closeDatabase() {

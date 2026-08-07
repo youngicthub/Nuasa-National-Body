@@ -14,7 +14,7 @@ echo "[start-api] FRONTEND_URL=${FRONTEND_URL}"
 # Replit commonly exposes an attached Neon database as DATABASE_URL. Keep
 # NEON_DATABASE_URL supported for existing deployments, but prefer either
 # configured remote URL over silently starting an empty local database.
-REMOTE_DATABASE_URL="${NEON_DATABASE_URL:-${DATABASE_URL:-}}"
+REMOTE_DATABASE_URL="${NEON_DATABASE_URL:-}"
 if [ -n "$REMOTE_DATABASE_URL" ]; then
   if [ -n "${NEON_DATABASE_URL:-}" ]; then
     echo "[start-api] NEON_DATABASE_URL detected — skipping local PostgreSQL"
@@ -89,6 +89,7 @@ for i in $(seq 1 30); do
 done
 
 # Override DB connection env vars so the pg driver connects to local PG
+unset DATABASE_URL NEON_DATABASE_URL
 export DB_HOST=127.0.0.1
 export DB_PORT="$PG_PORT"
 export DB_USER="$_DB_USER"

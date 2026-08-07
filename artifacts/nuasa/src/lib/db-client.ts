@@ -52,8 +52,11 @@ function tableQuery(table: string) {
     single() { mode = "single"; return builder; },
     maybeSingle() { mode = "maybeSingle"; return builder; },
     insert(body: unknown) {
-      return request(`/data/${table}`, { method: "POST", body: JSON.stringify(body) })
+      const operation = request(`/data/${table}`, { method: "POST", body: JSON.stringify(body) })
         .then((payload) => ({ data: payload.data, error: null }));
+      return Object.assign(operation, {
+        select() { return operation; },
+      });
     },
     upsert(body: unknown) {
       return request(`/data/${table}?upsert=true`, { method: "POST", body: JSON.stringify(body) })

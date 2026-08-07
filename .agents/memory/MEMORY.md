@@ -5,3 +5,4 @@
 - [Artifact workflows](artifact-workflows.md) — Use artifact-managed service workflows as canonical; remove duplicate legacy workflows after artifact registration.
 - [NUASA API URL config](nuasa-api-url-config.md) — config.js/VITE_API_URL must be unset in dev or CORS breaks; only set the production URL in the afeeshost-deployed config.js.
 - [Imported workflow naming](imported-workflow-naming.md) — Imported artifact metadata may exist without runtime registration; verify actual workflow names before restarting.
+- [Local schema environment precedence](local-schema-environment-precedence.md) — When local PostgreSQL is the dev fallback, unset remote database variables before starting the API or the client can still connect to the wrong schema.

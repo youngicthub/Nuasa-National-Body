@@ -72,6 +72,13 @@ const REGISTRATION_LABELS: Record<string, string> = {
   chapter: "Chapter",
 };
 
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  successful: "Payment Successful",
+  pending: "Payment Pending",
+  rejected: "Payment Rejected",
+  failed: "Payment Failed",
+};
+
 const UserDashboard = () => {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -622,17 +629,18 @@ const UserDashboard = () => {
                     <div className="space-y-4">
                       {conventionRegs.map((r: any) => {
                         const isConfirmed = r.payment_status === "successful";
+                        const isRejected = r.payment_status === "rejected";
                         const categoryLabel = REGISTRATION_LABELS[r.registration_type] || r.registration_type;
                         return (
                           <div key={r.id} className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
                             {/* Status bar */}
-                            <div className={`px-6 py-3 flex items-center justify-between ${isConfirmed ? "bg-accent/10 border-b border-accent/20" : "bg-muted border-b border-border"}`}>
+                             <div className={`px-6 py-3 flex items-center justify-between ${isConfirmed ? "bg-accent/10 border-b border-accent/20" : isRejected ? "bg-orange-50 border-b border-orange-200" : "bg-muted border-b border-border"}`}>
                               <div className="flex items-center gap-2">
-                                {isConfirmed
-                                  ? <CheckCircle2 className="w-4 h-4 text-accent" />
-                                  : <AlertCircle className="w-4 h-4 text-muted-foreground" />}
-                                <span className={`text-sm font-semibold ${isConfirmed ? "text-accent" : "text-muted-foreground"}`}>
-                                  {isConfirmed ? "Registration Confirmed" : `Payment ${r.payment_status}`}
+                                 {isConfirmed
+                                   ? <CheckCircle2 className="w-4 h-4 text-accent" />
+                                   : <AlertCircle className={`w-4 h-4 ${isRejected ? "text-orange-600" : "text-muted-foreground"}`} />}
+                                 <span className={`text-sm font-semibold ${isConfirmed ? "text-accent" : isRejected ? "text-orange-700" : "text-muted-foreground"}`}>
+                                   {isConfirmed ? "Registration Confirmed" : PAYMENT_STATUS_LABELS[r.payment_status] || `Payment ${r.payment_status}`}
                                 </span>
                               </div>
                               {/* Category badge — prominent, no amount */}

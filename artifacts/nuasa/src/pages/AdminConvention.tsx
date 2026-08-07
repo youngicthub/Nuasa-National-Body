@@ -51,10 +51,19 @@ const AdminConvention = () => {
   const { signOut } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "successful" | "pending" | "failed">("all");
+  const [filter, setFilter] = useState<"all" | "successful" | "pending" | "rejected" | "failed">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "student" | "graduate" | "chapter">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const paymentBadgeClass = (status: string) =>
+    status === "successful"
+      ? "bg-accent text-accent-foreground"
+      : status === "pending"
+        ? "bg-muted text-foreground"
+        : status === "rejected"
+          ? "bg-orange-100 text-orange-800"
+          : "bg-destructive text-destructive-foreground";
   const [selected, setSelected] = useState<Registration | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
 
@@ -270,7 +279,7 @@ const AdminConvention = () => {
                 </div>
                 <div className="p-4 border-b border-border flex gap-3 flex-wrap items-center text-xs">
                   <div className="flex gap-1">
-                    {(["all", "successful", "pending", "failed"] as const).map(s => (
+                     {(["all", "successful", "pending", "rejected", "failed"] as const).map(s => (
                       <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1 rounded-md capitalize ${filter === s ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{s}</button>
                     ))}
                   </div>
@@ -323,7 +332,7 @@ const AdminConvention = () => {
                           </TableCell>
                           <TableCell className="font-medium">NGN {Number(r.amount).toLocaleString()}</TableCell>
                           <TableCell>
-                            <Badge className={r.payment_status === "successful" ? "bg-accent text-accent-foreground" : r.payment_status === "pending" ? "bg-muted text-foreground" : "bg-destructive text-destructive-foreground"}>
+                            <Badge className={paymentBadgeClass(r.payment_status)}>
                               {r.payment_status}
                             </Badge>
                           </TableCell>
@@ -361,7 +370,7 @@ const AdminConvention = () => {
                         <TableCell>{r.full_name}</TableCell>
                         <TableCell>NGN {Number(r.amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge className={r.payment_status === "successful" ? "bg-accent text-accent-foreground" : r.payment_status === "pending" ? "bg-muted text-foreground" : "bg-destructive text-destructive-foreground"}>
+                          <Badge className={paymentBadgeClass(r.payment_status)}>
                             {r.payment_status}
                           </Badge>
                         </TableCell>
@@ -420,7 +429,7 @@ const AdminConvention = () => {
                   <div className="text-xs text-muted-foreground">Reference</div>
                   <div className="font-mono font-bold">{selected.reference_code}</div>
                 </div>
-                <Badge className={selected.payment_status === "successful" ? "bg-accent text-accent-foreground" : selected.payment_status === "pending" ? "bg-muted text-foreground" : "bg-destructive text-destructive-foreground"}>
+                <Badge className={paymentBadgeClass(selected.payment_status)}>
                   {selected.payment_status}
                 </Badge>
               </div>

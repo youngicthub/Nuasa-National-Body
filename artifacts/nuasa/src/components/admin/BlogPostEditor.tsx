@@ -181,11 +181,9 @@ export function BlogPostEditor({ post, onSuccess, onCancel }: BlogPostEditorProp
         // Create new post
         const { data, error } = await dbClient
           .from("blog_posts")
-          .insert(postData)
-          .select("id")
-          .single();
+          .insert(postData);
         if (error) throw error;
-        postId = data.id;
+        postId = data?.id;
       }
 
       // Handle tags

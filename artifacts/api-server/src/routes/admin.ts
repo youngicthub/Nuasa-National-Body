@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { requireAdmin } from "../middleware/auth";
-import { query } from "../lib/db";
+import { query, withTransaction } from "../lib/db";
 
 const router = Router();
 
@@ -104,7 +104,7 @@ router.post("/admin/transactions/:id/verify", requireAdmin, async (req, res, nex
 
     // Allow manual override via request body: { status: "successful" | "failed" }
     const manualStatus = (req.body?.status || "").toLowerCase();
-    if (manualStatus === "successful" || manualStatus === "failed" || manualStatus === "pending") {
+    if (["successful", "pending", "rejected", "failed"].includes(manualStatus)) {
       await query(
         "UPDATE convention_registrations SET payment_status = ?, updated_at = NOW() WHERE id = ?",
         [manualStatus, reg.id],
@@ -186,13 +186,13 @@ router.post("/admin/transactions/mark-pending-successful", requireAdmin, async (
 
 /**
  * POST /api/admin/transactions/:id/mark
- * Manually set payment_status to any valid value (successful / pending / failed).
+ * Manually set payment_status to any valid value.
  */
 router.post("/admin/transactions/:id/mark", requireAdmin, async (req, res, next) => {
   try {
     const status = (req.body?.status || "").toLowerCase();
-    if (!["successful", "pending", "failed"].includes(status)) {
-      res.status(400).json({ data: null, error: { message: "status must be 'successful', 'pending', or 'failed'" } });
+    if (!["successful", "pending", "rejected", "failed"].includes(status)) {
+      res.status(400).json({ data: null, error: { message: "status must be 'successful', 'pending', 'rejected', or 'failed'" } });
       return;
     }
     const rows = await query<{ id: string }[]>(
@@ -228,30 +228,17 @@ router.delete("/admin/registrations/by-email", requireAdmin, async (req, res, ne
       return;
     }
     const placeholders = emails.map(() => "?").join(",");
-    // Delete convention registrations
-    await query(
-      `DELETE FROM convention_registrations WHERE LOWER(email) IN (${placeholders})`,
-      emails,
-    );
-    // Find user IDs for those emails
-    const userRows = await query<{ id: string }[]>(
-      `SELECT id FROM users WHERE LOWER(email) IN (${placeholders})`,
-      emails,
-    );
-    for (const { id } of userRows) {
-      await query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [id]);
-      await query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [id]);
-      await query("DELETE FROM auth_tokens WHERE user_id = ?", [id]);
-      await query("DELETE FROM saved_posts WHERE user_id = ?", [id]);
-      await query("DELETE FROM saved_resources WHERE user_id = ?", [id]);
-      await query("DELETE FROM post_views WHERE user_id = ?", [id]);
-      await query("DELETE FROM resource_views WHERE user_id = ?", [id]);
-      await query("DELETE FROM resource_downloads WHERE user_id = ?", [id]);
-      await query("DELETE FROM admin_login_log WHERE user_id = ?", [id]);
-      await query("DELETE FROM user_roles WHERE user_id = ?", [id]);
-      await query("DELETE FROM profiles WHERE user_id = ?", [id]);
-      await query("DELETE FROM users WHERE id = ?", [id]);
-    }
+    const userRows = await withTransaction(async (tx) => {
+      await tx.query(`DELETE FROM convention_registrations WHERE LOWER(email) IN (${placeholders})`, emails);
+      const rows = await tx.query<{ id: string }[]>(
+        `SELECT id FROM users WHERE LOWER(email) IN (${placeholders})`,
+        emails,
+      );
+      for (const { id } of rows) {
+        await deleteUserData(tx, id);
+      }
+      return rows;
+    });
     res.json({ data: { deleted_registrations: emails.length, deleted_users: userRows.length }, error: null });
   } catch (err) {
     next(err);
@@ -308,6 +295,26 @@ router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
     next(err);
   }
 });
+
+async function deleteUserData(
+  tx: { query: <R = unknown[]>(sql: string, params?: unknown[]) => Promise<R> },
+  userId: string,
+) {
+  // Public content remains available, but is no longer attributed to a deleted account.
+  await tx.query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [userId]);
+  await tx.query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [userId]);
+  await tx.query("DELETE FROM auth_tokens WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM saved_posts WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM saved_resources WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM post_views WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM resource_views WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM resource_downloads WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM convention_registrations WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM admin_login_log WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM profiles WHERE user_id = ?", [userId]);
+  await tx.query("DELETE FROM users WHERE id = ?", [userId]);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ALL USERS (profiles + convention registrants without profiles)
@@ -412,6 +419,7 @@ router.get("/admin/convention-stats", requireAdmin, async (_req, res, next) => {
           COUNT(*)::int                                                             AS total,
           COUNT(*) FILTER (WHERE payment_status = 'successful')::int              AS successful,
           COUNT(*) FILTER (WHERE payment_status = 'pending')::int                 AS pending,
+         COUNT(*) FILTER (WHERE payment_status = 'rejected')::int                AS rejected,
           COUNT(*) FILTER (WHERE payment_status = 'failed')::int                  AS failed,
           COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int            AS today,
           COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', NOW()))::int   AS this_month,

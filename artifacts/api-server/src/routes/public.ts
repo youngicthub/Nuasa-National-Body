@@ -132,7 +132,7 @@ router.get("/tags", async (_req, res, next) => {
 router.get("/events", async (_req, res, next) => {
   try {
     const rows = await query<any[]>(
-      "SELECT * FROM events WHERE is_published = 1 ORDER BY start_time DESC",
+      "SELECT * FROM events WHERE is_published = true ORDER BY start_time DESC",
     );
     res.json(rows);
   } catch (err) {
@@ -219,14 +219,12 @@ router.post("/resources/:id/download", async (req, res, next) => {
 router.get("/executives", async (_req, res, next) => {
   try {
     const rows = await query<any[]>(
-      `SELECT id, name AS full_name, position, portfolio, department,
-              institution, state, image_url, bio, email, phone,
-              linkedin_url, twitter_url, term_start, term_end,
-              is_current AS is_active, display_order AS sort_order,
+      `SELECT id, full_name, position, bio, image_url, email, phone,
+              sort_order, is_active,
               created_at, updated_at
        FROM executives
-       WHERE is_current = true
-       ORDER BY display_order ASC`,
+       WHERE is_active = true
+       ORDER BY sort_order ASC`,
     );
     res.json(rows);
   } catch (err) {

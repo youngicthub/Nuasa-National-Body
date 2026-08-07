@@ -93,7 +93,6 @@ const AdminExecutives = () => {
   const photoFileRef = useRef<File | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // DB uses: name, display_order, is_current — app UI uses: full_name, sort_order, is_active
   const fromDb = (row: any): Executive => ({
     id: row.id,
     full_name: row.full_name ?? row.name ?? "",
@@ -107,14 +106,14 @@ const AdminExecutives = () => {
   });
 
   const toDb = (e: Omit<Executive, "id">) => ({
-    name: e.full_name,
+    full_name: e.full_name,
     position: e.position,
     bio: e.bio,
     image_url: e.image_url,
     email: e.email,
     phone: e.phone,
-    display_order: e.sort_order,
-    is_current: e.is_active,
+    sort_order: e.sort_order,
+    is_active: e.is_active,
     updated_at: new Date().toISOString(),
   });
 
@@ -124,7 +123,7 @@ const AdminExecutives = () => {
       const { data, error } = await (dbClient as any)
         .from("executives")
         .select("*")
-        .order("display_order", { ascending: true });
+        .order("sort_order", { ascending: true });
       if (error) throw error;
       return (data || []).map(fromDb) as Executive[];
     },

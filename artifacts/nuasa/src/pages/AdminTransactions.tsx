@@ -27,12 +27,12 @@ interface Transaction {
   email: string;
   amount: number | string;
   currency: string | null;
-  payment_status: "successful" | "pending" | "failed" | string;
+  payment_status: "successful" | "pending" | "rejected" | "failed" | string;
   registration_type: string;
   created_at: string;
 }
 
-const STATUS_FILTERS = ["all", "successful", "pending", "failed"] as const;
+const STATUS_FILTERS = ["all", "successful", "pending", "rejected", "failed"] as const;
 
 const AdminTransactions = () => {
   const qc = useQueryClient();
@@ -74,6 +74,7 @@ const AdminTransactions = () => {
       count:      rows.length,
       successful: ok.length,
       pending:    rows.filter((r) => r.payment_status === "pending").length,
+      rejected:   rows.filter((r) => r.payment_status === "rejected").length,
       failed:     rows.filter((r) => r.payment_status === "failed").length,
       revenue:    ok.reduce((s, r) => s + Number(r.amount || 0), 0),
     };
@@ -98,7 +99,7 @@ const AdminTransactions = () => {
   };
 
   // ── Manually set a single payment status ────────────────────────────────
-  const markStatus = async (r: Transaction, newStatus: "successful" | "pending" | "failed") => {
+  const markStatus = async (r: Transaction, newStatus: "successful" | "pending" | "rejected" | "failed") => {
     if (r.payment_status === newStatus) return;
     setChangingStatus(r.id);
     try {
@@ -106,7 +107,11 @@ const AdminTransactions = () => {
         `/admin/transactions/${r.id}/mark`,
         { method: "POST", body: JSON.stringify({ status: newStatus }) },
       );
-      const label = newStatus === "successful" ? "Approved" : newStatus === "failed" ? "Rejected" : "Marked pending";
+      const label =
+        newStatus === "successful" ? "Approved"
+          : newStatus === "rejected" ? "Rejected"
+          : newStatus === "failed" ? "Marked failed"
+          : "Marked pending";
       toast.success(`${label}: ${r.full_name}`);
       qc.invalidateQueries({ queryKey: ["admin-transactions"] });
     } catch (e: any) {
@@ -162,12 +167,14 @@ const AdminTransactions = () => {
   const badgeFor = (s: string) =>
     s === "successful" ? "bg-green-100 text-green-800 border-green-200"
       : s === "pending" ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+      : s === "rejected" ? "bg-orange-100 text-orange-800 border-orange-200"
       : "bg-red-100 text-red-800 border-red-200";
 
   const stats = [
     { label: "All Transactions",    value: totals.count },
     { label: "Successful",          value: totals.successful },
     { label: "Pending",             value: totals.pending },
+    { label: "Rejected",            value: totals.rejected },
     { label: "Failed",              value: totals.failed },
     { label: "Total Revenue (NGN)", value: totals.revenue.toLocaleString() },
   ];
@@ -323,6 +330,21 @@ const AdminTransactions = () => {
                               </Button>
                               <Button
                                 size="sm"
+                                variant={r.payment_status === "rejected" ? "default" : "outline"}
+                                className={`h-7 px-2 gap-1 text-xs ${
+                                  r.payment_status === "rejected"
+                                    ? "bg-orange-600 hover:bg-orange-700 text-white"
+                                    : "border-orange-300 text-orange-700 hover:bg-orange-50"
+                                }`}
+                                disabled={r.payment_status === "rejected"}
+                                onClick={() => markStatus(r, "rejected")}
+                                title="Reject payment"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant={r.payment_status === "failed" ? "default" : "outline"}
                                 className={`h-7 px-2 gap-1 text-xs ${
                                   r.payment_status === "failed"
@@ -331,10 +353,10 @@ const AdminTransactions = () => {
                                 }`}
                                 disabled={r.payment_status === "failed"}
                                 onClick={() => markStatus(r, "failed")}
-                                title="Reject payment"
+                                title="Mark payment failed"
                               >
                                 <XCircle className="w-3 h-3" />
-                                Reject
+                                Failed
                               </Button>
                             </>
                           )}
