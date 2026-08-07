@@ -10,22 +10,25 @@ else
 fi
 echo "[start-api] FRONTEND_URL=${FRONTEND_URL}"
 
-# ── If a remote database URL is configured, skip local PostgreSQL ─────────────
-# Replit commonly exposes an attached Neon database as DATABASE_URL. Keep
-# NEON_DATABASE_URL supported for existing deployments, but prefer either
-# configured remote URL over silently starting an empty local database.
+# ── Remote database selection ──────────────────────────────────────────────────
+# Development uses the complete local schema by default, even when Replit
+# exposes a hosted DATABASE_URL in the environment. Set USE_REMOTE_DATABASE=true
+# for an intentional remote-database development session; production continues
+# to use a configured remote URL when one is available.
 REMOTE_DATABASE_URL="${NEON_DATABASE_URL:-${DATABASE_URL:-}}"
-if [ -n "$REMOTE_DATABASE_URL" ]; then
-  if [ -n "${NEON_DATABASE_URL:-}" ]; then
-    echo "[start-api] NEON_DATABASE_URL detected — skipping local PostgreSQL"
-  else
-    echo "[start-api] DATABASE_URL detected — skipping local PostgreSQL"
+if [ "${NODE_ENV:-development}" = "production" ] || [ "${USE_REMOTE_DATABASE:-}" = "true" ]; then
+  if [ -n "$REMOTE_DATABASE_URL" ]; then
+    if [ -n "${NEON_DATABASE_URL:-}" ]; then
+      echo "[start-api] NEON_DATABASE_URL detected — skipping local PostgreSQL"
+    else
+      echo "[start-api] DATABASE_URL detected — skipping local PostgreSQL"
+    fi
+    cd /home/runner/workspace/artifacts/api-server
+    echo "[start-api] Building API server..."
+    pnpm run build
+    echo "[start-api] Starting API server..."
+    exec node --enable-source-maps ./dist/index.mjs
   fi
-  cd /home/runner/workspace/artifacts/api-server
-  echo "[start-api] Building API server..."
-  pnpm run build
-  echo "[start-api] Starting API server..."
-  exec node --enable-source-maps ./dist/index.mjs
 fi
 
 # ── Local PostgreSQL (dev fallback) ───────────────────────────────────────────
