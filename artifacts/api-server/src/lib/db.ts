@@ -19,6 +19,12 @@ export const pool = new Pool({
   max: Number(process.env.DB_CONNECTION_LIMIT || 10),
 });
 
+// Prevent unhandled 'error' events on idle clients from crashing the process.
+// pg emits these when the local PostgreSQL restarts or drops a connection.
+pool.on("error", (err) => {
+  console.error("[db] idle client error (pool will reconnect):", err.message);
+});
+
 function toPostgresPlaceholders(sql: string) {
   let idx = 0;
   return sql.replace(/\?/g, () => `$${++idx}`);
