@@ -2,11 +2,12 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Loader2, Search, Download, Eye, ShieldCheck, RefreshCw,
+  Loader2, Search, Download, Eye, ShieldCheck, RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -57,15 +58,39 @@ const AdminConvention = () => {
   const [dateTo, setDateTo] = useState("");
 
   const paymentBadgeClass = (status: string) =>
-    status === "successful"
-      ? "bg-accent text-accent-foreground"
-      : status === "pending"
-        ? "bg-muted text-foreground"
-        : status === "rejected"
-          ? "bg-orange-100 text-orange-800"
-          : "bg-destructive text-destructive-foreground";
+    (STATUS_META as any)[status]?.badge ?? "bg-muted text-foreground";
   const [selected, setSelected] = useState<Registration | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [changingStatus, setChangingStatus] = useState<string | null>(null);
+
+  const STATUSES = ["successful", "pending", "rejected", "failed"] as const;
+  type PaymentStatus = typeof STATUSES[number];
+
+  const STATUS_META: Record<PaymentStatus, { label: string; icon: React.ReactNode; badge: string }> = {
+    successful: { label: "Successful", icon: <CheckCircle2 className="w-3.5 h-3.5" />, badge: "bg-accent text-accent-foreground" },
+    pending:    { label: "Pending",    icon: <Clock        className="w-3.5 h-3.5" />, badge: "bg-muted text-foreground" },
+    rejected:   { label: "Rejected",  icon: <XCircle      className="w-3.5 h-3.5" />, badge: "bg-orange-100 text-orange-800" },
+    failed:     { label: "Failed",    icon: <AlertCircle  className="w-3.5 h-3.5" />, badge: "bg-destructive text-destructive-foreground" },
+  };
+
+  const changeStatus = async (id: string, status: PaymentStatus) => {
+    setChangingStatus(id);
+    try {
+      await apiFetch(`/admin/transactions/${id}/mark`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      });
+      toast.success(`Status changed to ${STATUS_META[status].label}`);
+      qc.invalidateQueries({ queryKey: ["admin-convention-regs"] });
+      qc.invalidateQueries({ queryKey: ["admin-convention-stats"] });
+      // Update selected dialog if open
+      if (selected?.id === id) setSelected(prev => prev ? { ...prev, payment_status: status } : prev);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update status");
+    } finally {
+      setChangingStatus(null);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-convention-regs"],
@@ -337,7 +362,29 @@ const AdminConvention = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelected(r); }}><Eye className="w-4 h-4" /></Button></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()} className="min-w-[170px]">
+                            <div className="flex items-center gap-1">
+                              <Select
+                                value={r.payment_status}
+                                onValueChange={(val) => changeStatus(r.id, val as PaymentStatus)}
+                                disabled={changingStatus === r.id}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-[130px]">
+                                  {changingStatus === r.id
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : <SelectValue />}
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUSES.map(s => (
+                                    <SelectItem key={s} value={s} className="text-xs">
+                                      <span className="flex items-center gap-1.5">{STATUS_META[s].icon} {STATUS_META[s].label}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button size="sm" variant="ghost" onClick={() => setSelected(r)}><Eye className="w-4 h-4" /></Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -348,8 +395,30 @@ const AdminConvention = () => {
 
             <TabsContent value="payments" className="mt-4">
               <div className="bg-card rounded-2xl border border-border">
-                <div className="p-4 border-b border-border text-sm text-muted-foreground flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4" /> Re-verify Flutterwave transactions and monitor payment health.
+                <div className="p-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" /> Manage payment statuses and re-verify Flutterwave transactions.
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90"
+                    onClick={async () => {
+                      try {
+                        const r = await apiFetch<{ data: { updated: number; total_successful: number }; error: null }>(
+                          "/admin/transactions/mark-pending-successful",
+                          { method: "POST" },
+                        );
+                        toast.success(`Marked ${r.data?.updated ?? 0} pending registrations as successful`);
+                        qc.invalidateQueries({ queryKey: ["admin-convention-regs"] });
+                        qc.invalidateQueries({ queryKey: ["admin-convention-stats"] });
+                      } catch (e: any) {
+                        toast.error(e.message || "Bulk update failed");
+                      }
+                    }}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Mark All Pending → Successful
+                  </Button>
                 </div>
                 <Table>
                   <TableHeader>
@@ -359,6 +428,7 @@ const AdminConvention = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Change Status</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -373,6 +443,26 @@ const AdminConvention = () => {
                           <Badge className={paymentBadgeClass(r.payment_status)}>
                             {r.payment_status}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={r.payment_status}
+                            onValueChange={(val) => changeStatus(r.id, val as PaymentStatus)}
+                            disabled={changingStatus === r.id}
+                          >
+                            <SelectTrigger className="h-7 text-xs w-[130px]">
+                              {changingStatus === r.id
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <SelectValue />}
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUSES.map(s => (
+                                <SelectItem key={s} value={s} className="text-xs">
+                                  <span className="flex items-center gap-1.5">{STATUS_META[s].icon} {STATUS_META[s].label}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <Button size="sm" variant="outline" disabled={!r.flw_transaction_id || verifying === r.id} onClick={() => verifyPayment(r)} className="gap-1">
@@ -467,11 +557,32 @@ const AdminConvention = () => {
                   <div className="bg-muted p-3 rounded">{selected.notes}</div>
                 </div>
               )}
-              <div className="flex gap-2 pt-2">
+              {/* Admin status control */}
+              <div className="border border-border rounded-lg p-3 bg-muted/40">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">Change Payment Status</div>
+                <div className="flex flex-wrap gap-2">
+                  {STATUSES.map(s => (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant={selected.payment_status === s ? "default" : "outline"}
+                      disabled={changingStatus === selected.id}
+                      onClick={() => changeStatus(selected.id, s)}
+                      className={`gap-1.5 text-xs ${selected.payment_status === s ? "" : ""}`}
+                    >
+                      {changingStatus === selected.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : STATUS_META[s].icon}
+                      {STATUS_META[s].label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
                 {selected.flw_transaction_id && (
                   <Button size="sm" variant="outline" disabled={verifying === selected.id} onClick={() => verifyPayment(selected)} className="gap-1">
                     {verifying === selected.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                    Re-verify payment
+                    Re-verify via Flutterwave
                   </Button>
                 )}
               </div>

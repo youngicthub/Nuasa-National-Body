@@ -255,7 +255,7 @@ router.get("/admin/posts", requireAdmin, async (req, res, next) => {
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 0;
     const limitClause = limit ? ` LIMIT ${limit}` : "";
     const rows = await query<any[]>(`
-      SELECT bp.id, bp.title, bp.slug, bp.status, bp.views,
+      SELECT bp.id, bp.title, bp.slug, bp.status, bp.view_count AS views,
              bp.published_at, bp.created_at,
              COALESCE(p.full_name, 'NUASA') AS author_name
       FROM   blog_posts bp
