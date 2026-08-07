@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash"]
+modules = ["nodejs-20", "web", "bash", "python-base-3.13"]
 
 [deployment]
 router = "application"
@@ -122,3 +122,6 @@ SMTP_PORT = "587"
 SMTP_SECURE = "false"
 SMTP_USER = "info@nuasanational.com.ng"
 UPLOAD_DIR = "uploads"
+
+[userenv.development]
+USE_REMOTE_DATABASE = "true"

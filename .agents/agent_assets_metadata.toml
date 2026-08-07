@@ -62,3 +62,17 @@ uri = "file://nuasa-frontend.zip"
 type = "unspecified"
 title = "nuasa-frontend.zip"
 description = "Updated frontend — email verification removed, login and forgot password fixed for users. Extract and upload the contents of public/ to public_html on AfeeHost."
+
+[[outputs]]
+id = "7vq6ouvc8RsCddRX5DN23"
+uri = "file://outputs/nuasa-afeeshost-dist.zip"
+type = "unspecified"
+title = "NUASA AfeeHost frontend ZIP"
+description = "Production static frontend build with SPA routing and the current published Replit API URL configured."
+
+[[outputs]]
+id = "bS-2ZjXRDk_5TQOCBZalC"
+uri = "file://outputs/nuasa-replit-api-bundle.zip"
+type = "unspecified"
+title = "NUASA Replit API bundle"
+description = "Production API bundle built after the Neon configuration and login error fixes."
