@@ -19,6 +19,112 @@ export const pool = new Pool({
   max: Number(process.env.DB_CONNECTION_LIMIT || 10),
 });
 
+const tableColumnsCache = new Map<string, Promise<Set<string>>>();
+
+export async function getTableColumns(table: string): Promise<Set<string>> {
+  const cached = tableColumnsCache.get(table);
+  if (cached) return cached;
+  const pending = pool
+    .query(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1`,
+      [table],
+    )
+    .then((result) => new Set(result.rows.map((row) => String(row.column_name))));
+  tableColumnsCache.set(table, pending);
+  return pending;
+}
+
+// The imported project used the newer names below, while the existing Neon
+// database still contains the original Supabase names. Keep the frontend
+// contract stable and translate only at the database boundary.
+const COLUMN_ALIASES: Record<string, Record<string, string>> = {
+  blog_posts: { cover_image: "cover_image_url", view_count: "views" },
+  library_resources: { cover_image: "cover_image_url" },
+  events: { start_time: "event_date", cover_image: "image_url", is_published: "is_featured" },
+  executives: { full_name: "name", sort_order: "display_order", is_active: "is_current" },
+};
+
+export function resolveColumn(table: string, column: string, columns: Set<string>): string | null {
+  if (columns.has(column)) return column;
+  const alias = COLUMN_ALIASES[table]?.[column];
+  return alias && columns.has(alias) ? alias : null;
+}
+
+export function normalizeDbRow(table: string, raw: any): any {
+  if (!raw || typeof raw !== "object") return raw;
+  const row = { ...raw };
+  const aliases = COLUMN_ALIASES[table] || {};
+  for (const [canonical, actual] of Object.entries(aliases)) {
+    if (row[canonical] === undefined && row[actual] !== undefined) {
+      row[canonical] = row[actual];
+    }
+  }
+  if (table === "library_resources") {
+    if (row.file_name === undefined && typeof row.file_url === "string") {
+      row.file_name = row.file_url.split("/").pop() || null;
+    }
+    if (row.is_public === undefined && row.access_level !== undefined) {
+      row.is_public = String(row.access_level).toLowerCase() === "public";
+    }
+  }
+  if (table === "blog_posts" && row.read_time === undefined) {
+    row.read_time = 5;
+  }
+  return row;
+}
+
+export function normalizeDbInput(table: string, input: Record<string, unknown>, columns: Set<string>) {
+  const output: Record<string, unknown> = {};
+  for (const [canonical, value] of Object.entries(input)) {
+    const actual = resolveColumn(table, canonical, columns);
+    if (!actual) continue;
+    let normalized = value;
+    if (table === "library_resources" && canonical === "is_public" && columns.has("access_level")) {
+      normalized = value ? "public" : "private";
+    }
+    output[actual] = normalized;
+  }
+  return output;
+}
+
+export async function deleteUserData(
+  tx: { query: <R = unknown[]>(sql: string, params?: unknown[]) => Promise<R> },
+  userId: string,
+) {
+  // Keep public content, but remove the deleted account's attribution where
+  // the active database schema supports it.
+  const blogColumns = await getTableColumns("blog_posts");
+  if (blogColumns.has("author_id")) {
+    await tx.query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [userId]);
+  }
+  const resourceColumns = await getTableColumns("library_resources");
+  if (resourceColumns.has("author_id")) {
+    await tx.query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [userId]);
+  }
+
+  const dependentTables = [
+    "auth_tokens",
+    "saved_posts",
+    "saved_resources",
+    "post_views",
+    "resource_views",
+    "resource_downloads",
+    "convention_registrations",
+    "admin_login_log",
+    "user_roles",
+    "profiles",
+  ] as const;
+  for (const table of dependentTables) {
+    const columns = await getTableColumns(table);
+    if (columns.has("user_id")) {
+      await tx.query(`DELETE FROM "${table}" WHERE user_id = ?`, [userId]);
+    }
+  }
+  await tx.query("DELETE FROM users WHERE id = ?", [userId]);
+}
+
 // Prevent unhandled 'error' events on idle clients from crashing the process.
 // pg emits these when the local PostgreSQL restarts or drops a connection.
 pool.on("error", (err) => {

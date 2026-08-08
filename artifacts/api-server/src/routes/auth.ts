@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import rateLimit from "express-rate-limit";
-import { query, withTransaction } from "../lib/db";
+import { deleteUserData, query, withTransaction } from "../lib/db";
 import { issueToken, optionalAuth, readAuth } from "../middleware/auth";
 
 const router = Router();
@@ -464,19 +464,7 @@ router.delete("/users/:id", async (req, res, next) => {
 
     if (userRows.length > 0) {
       await withTransaction(async (tx) => {
-        await tx.query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [targetId]);
-        await tx.query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [targetId]);
-        await tx.query("DELETE FROM auth_tokens WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM saved_posts WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM saved_resources WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM post_views WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM resource_views WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM resource_downloads WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM convention_registrations WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM admin_login_log WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM user_roles WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM profiles WHERE user_id = ?", [targetId]);
-        await tx.query("DELETE FROM users WHERE id = ?", [targetId]);
+        await deleteUserData(tx, targetId);
       });
     } else {
       // Convention-only registrant with no user account — targetId is the

@@ -12,13 +12,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { dbClient } from "@/lib/db-client";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Loader2, Printer, CheckCircle2, Calendar, MapPin, Users, Download, PartyPopper } from "lucide-react";
+import { Loader2, Printer, CheckCircle2, Calendar, MapPin, Users, Download, PartyPopper, Timer } from "lucide-react";
 import jsPDF from "jspdf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
-const PRICES = { student: 15000, graduate: 30000, chapter: 50000 } as const;
+const DEFAULT_PRICES = { student: 15000, graduate: 30000, chapter: 50000 } as const;
+const DEFAULT_STUDENT_PRICE_CHANGE_AT = "2026-08-09T00:00:00+01:00";
 const LABELS = { student: "Student", graduate: "Graduates", chapter: "Chapter" } as const;
 
 const BREAKOUT_SESSIONS = [
@@ -138,6 +139,10 @@ const Convention = () => {
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [publicKey, setPublicKey] = useState<string>("");
+  const [pricing, setPricing] = useState({
+    ...DEFAULT_PRICES,
+    student_price_change_at: DEFAULT_STUDENT_PRICE_CHANGE_AT,
+  });
   const [breakoutSession, setBreakoutSession] = useState<string>("");
   const [now, setNow] = useState(() => new Date());
   const [localExtras, setLocalExtras] = useState<Record<string, { delegates: any[]; breakoutSession: string | null }>>({});
@@ -159,6 +164,14 @@ const Convention = () => {
   useEffect(() => {
     dbClient.functions.invoke("convention-public-config").then(({ data }) => {
       if (data?.public_key) setPublicKey(data.public_key);
+      if (data?.pricing?.student) {
+        setPricing({
+          student: Number(data.pricing.student),
+          graduate: Number(data.pricing.graduate ?? DEFAULT_PRICES.graduate),
+          chapter: Number(data.pricing.chapter ?? DEFAULT_PRICES.chapter),
+          student_price_change_at: data.pricing.student_price_change_at || DEFAULT_STUDENT_PRICE_CHANGE_AT,
+        });
+      }
     });
   }, []);
 
@@ -176,8 +189,15 @@ const Convention = () => {
     },
   });
 
-  const basePrice = PRICES[type];
+  const basePrice = pricing[type];
   const amount = basePrice;
+  const priceChangeAt = new Date(pricing.student_price_change_at).getTime();
+  const remaining = Math.max(0, priceChangeAt - now.getTime());
+  const countdownDays = Math.floor(remaining / 86_400_000);
+  const countdownHours = Math.floor((remaining % 86_400_000) / 3_600_000);
+  const countdownMinutes = Math.floor((remaining % 3_600_000) / 60_000);
+  const countdownSeconds = Math.floor((remaining % 60_000) / 1_000);
+  const priceHasChanged = now.getTime() >= priceChangeAt;
 
   const updateDelegate = (idx: number, field: DelegateField, value: string) => {
     const formattedValue =
@@ -549,12 +569,28 @@ const Convention = () => {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <Label className="mb-2 block">Registration Type</Label>
+                {priceHasChanged ? (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-accent">
+                    <Timer className="h-4 w-4 shrink-0" />
+                    Student registration is now ₦{pricing.student.toLocaleString()}.
+                  </div>
+                ) : (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-accent">
+                    <Timer className="h-4 w-4 shrink-0" />
+                    Student registration increases to ₦20,000 in{" "}
+                    <strong>
+                      {countdownDays}d {String(countdownHours).padStart(2, "0")}h{" "}
+                      {String(countdownMinutes).padStart(2, "0")}m{" "}
+                      {String(countdownSeconds).padStart(2, "0")}s
+                    </strong>.
+                  </div>
+                )}
                 <RadioGroup value={type} onValueChange={(v) => setType(v as any)} className="grid sm:grid-cols-3 gap-3">
                   {(["student", "graduate", "chapter"] as const).map((t) => (
                     <label key={t} htmlFor={`t-${t}`} className={`border rounded-xl p-4 cursor-pointer transition-colors ${type === t ? "border-accent bg-accent/5" : "border-border hover:border-accent/50"}`}>
                       <RadioGroupItem id={`t-${t}`} value={t} className="sr-only" />
                       <div className="font-medium">{LABELS[t]}</div>
-                      <div className="text-2xl font-bold mt-1">₦{PRICES[t].toLocaleString()}</div>
+                      <div className="text-2xl font-bold mt-1">₦{pricing[t].toLocaleString()}</div>
                     </label>
                   ))}
                 </RadioGroup>

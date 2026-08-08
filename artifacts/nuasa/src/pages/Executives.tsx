@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Mail, Phone, User, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import presidentPhoto from "@assets/president-daniel-temple.asset.json_1782102193392.jpg";
 
 type Executive = {
@@ -22,9 +23,7 @@ const Executives = () => {
   const { data: executives = [], isLoading } = useQuery<Executive[]>({
     queryKey: ["public-executives"],
     queryFn: async () => {
-      const res = await fetch("/api/executives");
-      if (!res.ok) throw new Error("Failed to load executives");
-      return res.json();
+      return apiFetch<Executive[]>("/executives");
     },
   });
 

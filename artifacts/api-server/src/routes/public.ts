@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { query } from "../lib/db";
+import { getTableColumns, normalizeDbRow, query, resolveColumn } from "../lib/db";
 
 const router = Router();
 
@@ -22,12 +22,15 @@ router.get("/posts", async (req, res, next) => {
       ORDER  BY bp.published_at DESC
       ${limitClause}
     `);
-    res.json(rows.map((r) => ({
+    res.json(rows.map((raw) => {
+      const r = normalizeDbRow("blog_posts", raw);
+      return {
         ...r,
         category: r.category_name
           ? { name: r.category_name, slug: r.category_slug }
           : null,
-      })));
+      };
+    }));
   } catch (err) {
     next(err);
   }
@@ -51,9 +54,11 @@ router.get("/posts/:slug", async (req, res, next) => {
       return;
     }
     // Increment view count (fire-and-forget)
-    query("UPDATE blog_posts SET views = views + 1 WHERE id = ?", [rows[0].id]).catch(() => {});
+    const blogColumns = await getTableColumns("blog_posts");
+    const viewColumn = blogColumns.has("view_count") ? "view_count" : "views";
+    query(`UPDATE blog_posts SET "${viewColumn}" = "${viewColumn}" + 1 WHERE id = ?`, [rows[0].id]).catch(() => {});
     res.json({
-      ...rows[0],
+      ...normalizeDbRow("blog_posts", rows[0]),
       category: rows[0].category_name
         ? { name: rows[0].category_name, slug: rows[0].category_slug }
         : null,
@@ -84,13 +89,16 @@ router.get("/posts/:id/related", async (req, res, next) => {
       res.json([]);
       return;
     }
+    const blogColumns = await getTableColumns("blog_posts");
+    const readTimeColumn = blogColumns.has("read_time") ? "read_time" : null;
     const rows = await query<any[]>(
-      `SELECT id, title, slug, read_time FROM blog_posts
+      `SELECT id, title, slug${readTimeColumn ? `, "${readTimeColumn}" AS read_time` : ""}
+       FROM blog_posts
        WHERE  status = 'published' AND category_id = ? AND id != ?
        LIMIT  3`,
       [categoryId, req.params.id],
     );
-    res.json(rows);
+    res.json(rows.map((row) => normalizeDbRow("blog_posts", row)));
   } catch (err) {
     next(err);
   }
@@ -131,10 +139,14 @@ router.get("/tags", async (_req, res, next) => {
 
 router.get("/events", async (_req, res, next) => {
   try {
+    const columns = await getTableColumns("events");
+    const publishedColumn = resolveColumn("events", "is_published", columns);
+    const startColumn = resolveColumn("events", "start_time", columns);
+    if (!publishedColumn || !startColumn) throw new Error("Events table is missing publication or date columns");
     const rows = await query<any[]>(
-      "SELECT * FROM events WHERE is_published = true ORDER BY start_time DESC",
+      `SELECT * FROM events WHERE "${publishedColumn}" = true ORDER BY "${startColumn}" DESC`,
     );
-    res.json(rows);
+    res.json(rows.map((row) => normalizeDbRow("events", row)));
   } catch (err) {
     next(err);
   }
@@ -147,7 +159,7 @@ router.get("/chapters", async (_req, res, next) => {
     const rows = await query<any[]>(
       "SELECT * FROM chapters WHERE is_active = true ORDER BY display_order ASC, name ASC",
     );
-    res.json(rows);
+    res.json(rows.map((row) => normalizeDbRow("chapters", row)));
   } catch (err) {
     next(err);
   }
@@ -166,12 +178,15 @@ router.get("/resources", async (_req, res, next) => {
       ORDER  BY lr.created_at DESC
     `);
     res.json(
-      rows.map((r) => ({
+      rows.map((raw) => {
+        const r = normalizeDbRow("library_resources", raw);
+        return {
         ...r,
         category: r.category_name
           ? { name: r.category_name, slug: r.category_slug }
           : null,
-      })),
+        };
+      }),
     );
   } catch (err) {
     next(err);
@@ -192,7 +207,7 @@ router.get("/resources/:id", async (req, res, next) => {
       return;
     }
     res.json({
-      ...rows[0],
+      ...normalizeDbRow("library_resources", rows[0]),
       category: rows[0].category_name
         ? { name: rows[0].category_name, slug: rows[0].category_slug }
         : null,
@@ -218,15 +233,16 @@ router.post("/resources/:id/download", async (req, res, next) => {
 
 router.get("/executives", async (_req, res, next) => {
   try {
+    const columns = await getTableColumns("executives");
+    const activeColumn = resolveColumn("executives", "is_active", columns);
+    const orderColumn = resolveColumn("executives", "sort_order", columns);
+    if (!activeColumn || !orderColumn) throw new Error("Executives table is missing status or order columns");
     const rows = await query<any[]>(
-      `SELECT id, full_name, position, bio, image_url, email, phone,
-              sort_order, is_active,
-              created_at, updated_at
-       FROM executives
-       WHERE is_active = true
-       ORDER BY sort_order ASC`,
+      `SELECT * FROM executives
+       WHERE "${activeColumn}" = true
+       ORDER BY "${orderColumn}" ASC`,
     );
-    res.json(rows);
+    res.json(rows.map((row) => normalizeDbRow("executives", row)));
   } catch (err) {
     next(err);
   }

@@ -4,9 +4,16 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import multer from "multer";
 import bcrypt from "bcryptjs";
-import { query } from "../lib/db";
+import {
+  getTableColumns,
+  normalizeDbInput,
+  normalizeDbRow,
+  query,
+  resolveColumn,
+} from "../lib/db";
 import { optionalAuth } from "../middleware/auth";
 import { maybeCompress } from "../lib/compress";
+import { getConventionPricing } from "../lib/convention";
 
 const router = Router();
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
@@ -82,41 +89,51 @@ function forbidden(res: any) {
 }
 
 // Returns column identifiers escaped with PostgreSQL double-quotes
-function cleanColumns(value: unknown, _table: string) {
+function cleanColumns(value: unknown, table: string, columns: Set<string>) {
   const allowed = /^[a-zA-Z0-9_, ]+$/.test(String(value || ""))
     ? String(value).split(",").map((column) => column.trim().split(":")[0]).filter(Boolean)
     : [];
   const cols = allowed.length
-    ? allowed.filter((column) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)).map((col) => `"${col}"`)
+    ? allowed
+      .filter((column) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column))
+      .map((column) => resolveColumn(table, column, columns))
+      .filter((column): column is string => Boolean(column))
+      .map((col) => `"${col}"`)
     : [];
   return cols.length ? cols : ["*"];
 }
 
-function parseFilters(queryParams: Record<string, unknown>) {
+function parseFilters(queryParams: Record<string, unknown>, table: string, columns: Set<string>) {
   const filters: string[] = [];
   const params: unknown[] = [];
   for (const [key, value] of Object.entries(queryParams)) {
     if (["select", "order", "limit", "offset", "head", "single", "maybeSingle", "upsert"].includes(key)) continue;
     if (key.startsWith("in.") && typeof value === "string") {
       const column = key.slice(3);
-      if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)) {
+      const actualColumn = resolveColumn(table, column, columns);
+      if (actualColumn) {
         const values = value.split(",").filter(Boolean);
         if (values.length) {
-          filters.push(`"${column}" IN (${values.map(() => "?").join(",")})`);
-          params.push(...values);
+          filters.push(`"${actualColumn}" IN (${values.map(() => "?").join(",")})`);
+          params.push(...(table === "library_resources" && column === "is_public"
+            ? values.map((value) => value === "true" ? "public" : "private")
+            : values));
         }
       }
       continue;
     }
     const operator = key.includes(".") ? key.slice(0, key.indexOf(".")) : "eq";
     const column = key.includes(".") ? key.slice(key.indexOf(".") + 1) : key;
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column)) continue;
+    const actualColumn = resolveColumn(table, column, columns);
+    if (!actualColumn) continue;
     if (operator === "not" && typeof value === "string") {
-      filters.push(`"${column}" IS NOT NULL`);
+      filters.push(`"${actualColumn}" IS NOT NULL`);
     } else if (["eq", "gte", "lte", "lt", "gt"].includes(operator)) {
       const SQL_OP: Record<string, string> = { eq: "=", gte: ">=", lte: "<=", lt: "<", gt: ">" };
-      filters.push(`"${column}" ${SQL_OP[operator]} ?`);
-      params.push(value);
+      filters.push(`"${actualColumn}" ${SQL_OP[operator]} ?`);
+      params.push(table === "library_resources" && column === "is_public"
+        ? (value === "true" ? "public" : "private")
+        : value);
     }
   }
   return { filters, params };
@@ -143,27 +160,33 @@ router.use("/data", optionalAuth);
 router.get("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
+    const columns = await getTableColumns(table);
     const ownerColumn = OWNED_TABLES[table];
     if (!PUBLIC_TABLES.has(table)) {
       if (!ensureAuth(req, res)) return;
       if (!ownerColumn && !isAdmin(req)) return forbidden(res);
     }
-    const columns = cleanColumns(req.query.select, table).join(", ");
-    const { filters, params } = parseFilters(req.query as Record<string, unknown>);
+    const selectedColumns = cleanColumns(req.query.select, table, columns).join(", ");
+    const { filters, params } = parseFilters(req.query as Record<string, unknown>, table, columns);
     if (ownerColumn && !isAdmin(req)) {
       filters.push(`"${ownerColumn}" = ?`);
       params.push(req.authUser!.id);
     }
     const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
-    const order = typeof req.query.order === "string" && /^[a-zA-Z_][a-zA-Z0-9_]*(\.(asc|desc))?$/.test(req.query.order)
-      ? ` ORDER BY "${req.query.order.split(".")[0]}" ${req.query.order.endsWith(".desc") ? "DESC" : "ASC"}` : "";
+    const requestedOrder = typeof req.query.order === "string" ? req.query.order : "";
+    const orderColumn = requestedOrder ? resolveColumn(table, requestedOrder.split(".")[0], columns) : null;
+    const order = orderColumn && /^[a-zA-Z_][a-zA-Z0-9_]*(\.(asc|desc))?$/.test(requestedOrder)
+      ? ` ORDER BY "${orderColumn}" ${requestedOrder.endsWith(".desc") ? "DESC" : "ASC"}` : "";
     const limit = req.query.limit && /^\d+$/.test(String(req.query.limit)) ? ` LIMIT ${Math.min(Number(req.query.limit), 2000)}` : "";
-    const rows = await query<any[]>(`SELECT ${columns} FROM "${table}"${where}${order}${limit}`, params);
+    const rows = await query<any[]>(`SELECT ${selectedColumns} FROM "${table}"${where}${order}${limit}`, params);
     if (req.query.head === "true") {
       res.json({ data: null, count: rows.length, error: null });
       return;
     }
-    const data = req.query.single === "true" || req.query.maybeSingle === "true" ? rows[0] || null : rows;
+    const normalizedRows = rows.map((row) => normalizeDbRow(table, row));
+    const data = req.query.single === "true" || req.query.maybeSingle === "true"
+      ? normalizedRows[0] || null
+      : normalizedRows;
     res.json({ data, error: null });
   } catch (err) {
     next(err);
@@ -175,6 +198,7 @@ router.get("/data/:table", async (req, res, next) => {
 router.post("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
+    const columns = await getTableColumns(table);
     const ownerColumn = OWNED_TABLES[table];
 
     // ── Auto-create user account for unauthenticated convention registrations ──
@@ -235,11 +259,7 @@ router.post("/data/:table", async (req, res, next) => {
     // Server-side canonical prices for convention registrations.
     // These are the source of truth — the frontend amount is always overridden
     // so neither bugs nor tampering can produce wrong revenue figures.
-    const CONVENTION_PRICES: Record<string, number> = {
-      student:  15000,
-      graduate: 30000,
-      chapter:  50000,
-    };
+    const CONVENTION_PRICES: Record<string, number> = getConventionPricing();
 
     const inserted: any[] = [];
     for (const input of records) {
@@ -264,8 +284,9 @@ router.post("/data/:table", async (req, res, next) => {
           row.payment_amount = canonicalPrice;
         }
       }
-      const keys = Object.keys(row).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key));
-      const values = keys.map((key) => row[key] === undefined ? null : row[key]);
+      const dbRow = normalizeDbInput(table, row, columns);
+      const keys = Object.keys(dbRow);
+      const values = keys.map((key) => dbRow[key] === undefined ? null : dbRow[key]);
       const updateKeys = keys.filter((key) => key !== "id" && key !== "key");
       // PostgreSQL upsert: ON CONFLICT (...) DO UPDATE SET ...
       const duplicateClause = req.query.upsert === "true" && updateKeys.length
@@ -287,7 +308,7 @@ router.post("/data/:table", async (req, res, next) => {
         }
         throw error;
       }
-      inserted.push(row);
+      inserted.push(normalizeDbRow(table, row));
     }
     res.status(201).json({ data: Array.isArray(req.body) ? inserted : inserted[0], error: null });
   } catch (err) {
@@ -300,17 +321,19 @@ router.post("/data/:table", async (req, res, next) => {
 router.patch("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
+    const columns = await getTableColumns(table);
     if (!ensureAuth(req, res)) return;
     const ownerColumn = OWNED_TABLES[table];
     const admin = isAdmin(req);
     if (ADMIN_WRITE_TABLES.has(table) && !admin) return forbidden(res);
-    const keys = Object.keys(req.body || {}).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key) && key !== "id");
-    const parsed = parseFilters(req.query as Record<string, unknown>);
+    const dbBody = normalizeDbInput(table, req.body || {}, columns);
+    const keys = Object.keys(dbBody).filter((key) => key !== "id");
+    const parsed = parseFilters(req.query as Record<string, unknown>, table, columns);
     if (ownerColumn && !admin) {
       parsed.filters.push(`"${ownerColumn}" = ?`);
       parsed.params.push(req.authUser!.id);
     }
-    const params = [...keys.map((key) => req.body[key]), ...parsed.params];
+    const params = [...keys.map((key) => dbBody[key]), ...parsed.params];
     if (!keys.length || !parsed.filters.length) {
       res.status(400).json({ error: "Update requires fields and a filter" });
       return;
@@ -330,11 +353,12 @@ router.patch("/data/:table", async (req, res, next) => {
 router.delete("/data/:table", async (req, res, next) => {
   try {
     const table = assertTable(req.params.table);
+    const columns = await getTableColumns(table);
     if (!ensureAuth(req, res)) return;
     const ownerColumn = OWNED_TABLES[table];
     const admin = isAdmin(req);
     if (ADMIN_WRITE_TABLES.has(table) && !admin) return forbidden(res);
-    const parsed = parseFilters(req.query as Record<string, unknown>);
+    const parsed = parseFilters(req.query as Record<string, unknown>, table, columns);
     if (ownerColumn && !admin) {
       parsed.filters.push(`"${ownerColumn}" = ?`);
       parsed.params.push(req.authUser!.id);
@@ -399,9 +423,21 @@ router.post("/functions/:name", optionalAuth, async (req, res) => {
             : JSON.parse(rows[0].value as string);
         if (v.public_key) publicKey = v.public_key;
       }
-      res.json({ data: { public_key: publicKey }, error: null });
+      res.json({
+        data: {
+          public_key: publicKey,
+          pricing: getConventionPricing(),
+        },
+        error: null,
+      });
     } catch {
-      res.json({ data: { public_key: process.env.FLUTTERWAVE_PUBLIC_KEY || "" }, error: null });
+      res.json({
+        data: {
+          public_key: process.env.FLUTTERWAVE_PUBLIC_KEY || "",
+          pricing: getConventionPricing(),
+        },
+        error: null,
+      });
     }
     return;
   }

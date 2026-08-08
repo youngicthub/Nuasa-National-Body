@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { requireAdmin } from "../middleware/auth";
-import { query, withTransaction } from "../lib/db";
+import { deleteUserData, getTableColumns, query, withTransaction } from "../lib/db";
 
 const router = Router();
 
@@ -251,11 +251,13 @@ router.delete("/admin/registrations/by-email", requireAdmin, async (req, res, ne
 
 router.get("/admin/posts", requireAdmin, async (req, res, next) => {
   try {
+    const blogColumns = await getTableColumns("blog_posts");
+    const viewColumn = blogColumns.has("view_count") ? "view_count" : "views";
     const parsedLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 0;
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 0;
     const limitClause = limit ? ` LIMIT ${limit}` : "";
     const rows = await query<any[]>(`
-      SELECT bp.id, bp.title, bp.slug, bp.status, bp.view_count AS views,
+       SELECT bp.id, bp.title, bp.slug, bp.status, bp."${viewColumn}" AS views,
              bp.published_at, bp.created_at,
              COALESCE(p.full_name, 'NUASA') AS author_name
       FROM   blog_posts bp
@@ -295,26 +297,6 @@ router.delete("/admin/posts/:id", requireAdmin, async (req, res, next) => {
     next(err);
   }
 });
-
-async function deleteUserData(
-  tx: { query: <R = unknown[]>(sql: string, params?: unknown[]) => Promise<R> },
-  userId: string,
-) {
-  // Public content remains available, but is no longer attributed to a deleted account.
-  await tx.query("UPDATE blog_posts SET author_id = NULL WHERE author_id = ?", [userId]);
-  await tx.query("UPDATE library_resources SET author_id = NULL WHERE author_id = ?", [userId]);
-  await tx.query("DELETE FROM auth_tokens WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM saved_posts WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM saved_resources WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM post_views WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM resource_views WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM resource_downloads WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM convention_registrations WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM admin_login_log WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM profiles WHERE user_id = ?", [userId]);
-  await tx.query("DELETE FROM users WHERE id = ?", [userId]);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ALL USERS (profiles + convention registrants without profiles)
