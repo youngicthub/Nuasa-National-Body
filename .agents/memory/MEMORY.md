@@ -6,3 +6,4 @@
 - [NUASA API URL config](nuasa-api-url-config.md) — config.js/VITE_API_URL must be unset in dev or CORS breaks; only set the production URL in the afeeshost-deployed config.js.
 - [Imported workflow naming](imported-workflow-naming.md) — Imported artifact metadata may exist without runtime registration; verify actual workflow names before restarting.
 - [Local schema environment precedence](local-schema-environment-precedence.md) — When local PostgreSQL is the dev fallback, unset remote database variables before starting the API or the client can still connect to the wrong schema.
+- [PostgreSQL runtime discovery](postgres-runtime-discovery.md) — Replit’s PostgreSQL Nix store path can change; startup must discover the current runtime binaries instead of hard-coding a store path.

@@ -122,6 +122,3 @@ SMTP_PORT = "587"
 SMTP_SECURE = "false"
 SMTP_USER = "info@nuasanational.com.ng"
 UPLOAD_DIR = "uploads"
-
-[userenv.development]
-USE_REMOTE_DATABASE = "true"

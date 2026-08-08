@@ -67,8 +67,8 @@ description = "Updated frontend — email verification removed, login and forgot
 id = "7vq6ouvc8RsCddRX5DN23"
 uri = "file://outputs/nuasa-afeeshost-dist.zip"
 type = "unspecified"
-title = "NUASA AfeeHost frontend ZIP"
-description = "Production static frontend build with SPA routing and the current published Replit API URL configured."
+title = "NUASA AfeeHost frontend deployment"
+description = "Fresh production frontend bundle built with the live API URL, cleaned for static hosting, and verified as a valid ZIP archive."
 
 [[outputs]]
 id = "bS-2ZjXRDk_5TQOCBZalC"

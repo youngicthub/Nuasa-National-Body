@@ -18,9 +18,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
-const DEFAULT_PRICES = { student: 15000, graduate: 30000, chapter: 50000 } as const;
+type ConventionRegistrationType = "student" | "graduate" | "chapter";
+type ConventionPrices = Record<ConventionRegistrationType, number>;
+
+const DEFAULT_PRICES: ConventionPrices = { student: 15000, graduate: 30000, chapter: 50000 };
 const DEFAULT_STUDENT_PRICE_CHANGE_AT = "2026-08-09T00:00:00+01:00";
-const LABELS = { student: "Student", graduate: "Graduates", chapter: "Chapter" } as const;
+const LABELS: Record<ConventionRegistrationType, string> = {
+  student: "Student",
+  graduate: "Graduates",
+  chapter: "Chapter",
+};
 
 const BREAKOUT_SESSIONS = [
   "Investment Banking & Capital Markets",
@@ -119,7 +126,7 @@ const Convention = () => {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
 
-  const [type, setType] = useState<"student" | "graduate" | "chapter">("student");
+  const [type, setType] = useState<ConventionRegistrationType>("student");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");

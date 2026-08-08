@@ -32,7 +32,21 @@ if [ "${NODE_ENV:-development}" = "production" ] || [ "${USE_REMOTE_DATABASE:-}"
 fi
 
 # ── Local PostgreSQL (dev fallback) ───────────────────────────────────────────
-PG_BIN="/nix/store/ilv22ggshndixprdfpi4h1cdwq8qagmi-replit-runtime-path/bin"
+PG_BIN="${PG_BIN:-}"
+if [ -z "$PG_BIN" ] || [ ! -x "$PG_BIN/initdb" ]; then
+  for candidate in \
+    /nix/store/*-replit-runtime-path/bin \
+    /nix/store/*-postgresql*/bin; do
+    if [ -x "$candidate/initdb" ]; then
+      PG_BIN="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "$PG_BIN" ] || [ ! -x "$PG_BIN/initdb" ]; then
+  echo "[start-api] PostgreSQL tools not found (initdb is required)"
+  exit 1
+fi
 PG_DATADIR="/home/runner/.pg-data"
 PG_RUNDIR="/home/runner/.pg-run"
 PG_PORT=5432

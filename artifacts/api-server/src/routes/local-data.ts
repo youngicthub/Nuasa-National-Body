@@ -259,7 +259,11 @@ router.post("/data/:table", async (req, res, next) => {
     // Server-side canonical prices for convention registrations.
     // These are the source of truth — the frontend amount is always overridden
     // so neither bugs nor tampering can produce wrong revenue figures.
-    const CONVENTION_PRICES: Record<string, number> = getConventionPricing();
+    const CONVENTION_PRICES: Record<string, number> = {
+      student: getConventionPricing().student,
+      graduate: getConventionPricing().graduate,
+      chapter: getConventionPricing().chapter,
+    };
 
     const inserted: any[] = [];
     for (const input of records) {
